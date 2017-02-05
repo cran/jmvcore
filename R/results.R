@@ -1,4 +1,5 @@
 
+#' @importFrom rjson fromJSON
 ResultsElement <- R6::R6Class("ResultsElement",
     private=c(
         .name="",
@@ -6,7 +7,7 @@ ResultsElement <- R6::R6Class("ResultsElement",
         .titleValue="",
         .titleExpr="",
         .index=NA,
-        .visibleExpr="TRUE",
+        .visibleExpr=NA,
         .visibleValue=TRUE,
         .options=NA,
         .updated=FALSE,
@@ -58,13 +59,26 @@ ResultsElement <- R6::R6Class("ResultsElement",
             private$.options <- options
             private$.name <- name
             private$.titleExpr <- title
-            private$.visibleExpr <- paste0(visible)
+
+            if (identical(visible, TRUE))
+                private$.visibleExpr <- NULL
+            else
+                private$.visibleExpr <- paste0(visible)
+
             private$.clearWith <- clearWith
 
             private$.updated <- FALSE
             private$.state <- NULL
 
             private$.options$addChangeListener(self$.optionsChanged)
+        },
+        isFilled=function() {
+            if (private$.stale)
+                return(FALSE)
+            return(TRUE)
+        },
+        isNotFilled=function() {
+            ! self$isFilled()
         },
         .setKey = function(key, index) {
             private$.key <- key
@@ -77,23 +91,38 @@ ResultsElement <- R6::R6Class("ResultsElement",
         setState=function(state) {
             private$.state <- state
         },
+        setVisible=function(visible=TRUE) {
+            private$.visibleExpr <- paste0(visible)
+            private$.visibleValue <- visible
+        },
+        setTitle=function(title) {
+            private$.titleExpr <- title
+            private$.titleValue <- title
+        },
         .update=function() {
             if (private$.updated)
                 return()
 
             private$.updated <- TRUE
 
-            vis <- private$.options$eval(private$.visibleExpr, .key=private$.key, .name=private$.name, .index=private$.index)
-
-            if (is.logical(vis))
-                private$.visibleValue = vis
-            else
-                private$.visibleValue = (length(vis) > 0)
+            if (is.null(private$.visibleExpr) || private$.visibleExpr == 'TRUE') {
+                private$.visibleValue <- TRUE
+            }
+            else if (private$.visibleExpr == 'FALSE') {
+                private$.visibleValue <- FALSE
+            }
+            else {
+                vis <- private$.options$eval(private$.visibleExpr, .key=private$.key, .name=private$.name, .index=private$.index)
+                if (is.logical(vis))
+                    private$.visibleValue = vis
+                else
+                    private$.visibleValue = (length(vis) > 0)
+            }
 
             private$.titleValue <- paste0(private$.options$eval(private$.titleExpr, .key=private$.key, .name=private$.name, .index=private$.index))
         },
         .render=function(...) {
-
+            FALSE
         },
         .optionsChanged=function(...) {
             private$.updated <- FALSE
@@ -118,21 +147,47 @@ ResultsElement <- R6::R6Class("ResultsElement",
 
             initProtoBuf()
 
+            if (is.null(private$.visibleExpr))
+                v <- jamovi.coms.Visible$DEFAULT_YES
+            else if (identical(private$.visibleExpr, 'TRUE'))
+                v <- jamovi.coms.Visible$YES
+            else if (identical(private$.visibleExpr, 'FALSE'))
+                v <- jamovi.coms.Visible$NO
+            else if (self$visible)
+                v <- jamovi.coms.Visible$DEFAULT_YES
+            else
+                v <- jamovi.coms.Visible$DEFAULT_NO
+
+            if (self$isFilled())
+                s <- jamovi.coms.AnalysisStatus$ANALYSIS_COMPLETE
+            else if (private$.status == 'running')
+                s <- jamovi.coms.AnalysisStatus$ANALYSIS_RUNNING
+            else if (private$.status == 'inited')
+                s <- jamovi.coms.AnalysisStatus$ANALYSIS_INITED
+            else if (private$.status == 'complete')
+                s <- jamovi.coms.AnalysisStatus$ANALYSIS_COMPLETE
+            else
+                s <- jamovi.coms.AnalysisStatus$ANALYSIS_NONE
+
+            if ( ! is.null(status)) {
+                if (status == jamovi.coms.AnalysisStatus$ANALYSIS_ERROR)
+                    s <- status
+                else if (status == jamovi.coms.AnalysisStatus$ANALYSIS_COMPLETE)
+                    s <- status
+                else if (status == jamovi.coms.AnalysisStatus$ANALYSIS_RUNNING &&
+                         s != jamovi.coms.AnalysisStatus$ANALYSIS_COMPLETE)
+                    s <- status
+                else if (status == jamovi.coms.AnalysisStatus$ANALYSIS_INITED &&
+                         s == jamovi.coms.AnalysisStatus$ANALYSIS_NONE)
+                    s <- status
+            }
+
             element <- RProtoBuf::new(jamovi.coms.ResultsElement,
                 name=private$.name,
                 title=self$title,
-                stale=private$.stale)
-
-            if ( ! is.null(status))
-                element$status <- status
-            else if (private$.status == 'running')
-                element$status <- jamovi.coms.AnalysisStatus$ANALYSIS_RUNNING
-            else if (private$.status == 'inited')
-                element$status <- jamovi.coms.AnalysisStatus$ANALYSIS_INITED
-            else if (private$.status == 'complete')
-                element$status <- jamovi.coms.AnalysisStatus$ANALYSIS_COMPLETE
-            else
-                element$status <- jamovi.coms.AnalysisStatus$ANALYSIS_NONE
+                stale=private$.stale,
+                status=s,
+                visible=v)
 
             element
         },

@@ -1,5 +1,6 @@
 
 #' The jmv Options classes
+#' @importFrom rjson fromJSON
 #' @export
 Options <- R6::R6Class(
     "Options",
@@ -9,13 +10,17 @@ Options <- R6::R6Class(
         .listeners=NA,
         .pb=NA,
         .env=NA,
-        .ppi=72),
+        .ppi=72,
+        .requiresData=TRUE),
     active=list(
         analysis=function(analysis) {
             if (base::missing(analysis))
                 return(private$.analysis)
             private$.analysis <- analysis
             base::invisible(self)
+        },
+        requiresData=function() {
+            private$.requiresData
         },
         varsRequired=function() {
             vars <- list()
@@ -28,18 +33,20 @@ Options <- R6::R6Class(
         ppi=function() private$.ppi,
         options=function() private$.options),
     public=list(
-        initialize=function(...) {
-            
+        initialize=function(requiresData=TRUE, ...) {
+
+            private$.requiresData <- requiresData
+
             private$.analysis <- NULL
             private$.options <- list()
             private$.listeners <- list()
             private$.env <- new.env()
             private$.pb <- NULL
-            
+
             args <- list(...)
             if ('.ppi' %in% names(args))
                 private$.ppi <- args$.ppi
-            
+
             private$.env[["levels"]] <- self$levels
         },
         .addOption=function(option) {
@@ -60,60 +67,121 @@ Options <- R6::R6Class(
             private$.env
         },
         eval=function(value, ...) {
-            
+
             if (class(value) == "character") {
-                
+
+                if (is.null(value))
+                    return(NULL)
                 if (value == "TRUE")
                     return(TRUE)
                 if (value == "FALSE")
                     return(FALSE)
-                
+                if (value == '')
+                    return('')
+
                 vars <- list(...)
                 for (name in names(vars))
                     private$.env[[name]] <- vars[[name]]
-                private$.env[['data']] <- self$.getData()
-                
-                nch <- nchar(value)
-                if ( ! is.na(suppressWarnings(as.numeric(value))))
-                    value <- as.numeric(value)
-                else if (nch > 0 && substring(value, 1, 1) == "(" && substring(value, nch) == ")")
-                    value <- self$.eval(text=value)
-                else
-                    value <- jmvcore::format(value, ...)
-                
-                if (is.character(value))
-                    base::Encoding(value) <- 'UTF-8'
-                
+
+                match <- regexpr('^\\([\\$A-Za-z].*\\)$', value)
+
+                if (match != -1) {  # data-binding
+
+                    content <- substring(value, match + 1, attr(match, 'match.length') - 1)
+
+                    match <- regexpr('^levels\\([\\$A-Za-z].*\\)$', content)
+
+                    if (match != -1) {  # levels
+
+                        optionName <- substring(content, 8, nchar(content)-1)
+
+                        if (optionName == '$key') {
+                            optionValue <- vars$.key
+                        } else if (self$has(optionName)) {
+                            optionValue <- self$get(optionName)
+                        } else {
+                            reject("Option '{}' does not exist, cannot be bound to", optionName, code=NULL)
+                        }
+
+                        if (is.null(optionValue))
+                            return(character())
+
+                        data <- self$.getData()
+
+                        if (optionValue %in% colnames(data)) {
+                            return(base::levels(data[[optionValue]]))
+                        } else {
+                            reject("Variable '{}' does not exist in the data", optionValue, code=NULL)
+                        }
+                    }
+                    else if (content == '$key') {
+
+                        return(vars$.key)
+
+                    } else if (self$has(content)) {
+
+                        return(self$get(content))
+
+                    } else if (grepl('[A-Za-z][A-Za-z0-9]*:[A-Za-z][A-Za-z0-9]*', content)) {
+
+                        subed <- regexSub(
+                            '[A-Za-z][A-Za-z0-9]*:[A-Za-z][A-Za-z0-9]*',
+                            content,
+                            function(x) {
+                                split <- strsplit(x, ':')[[1]]
+                                name  <- split[1]
+                                value <- split[2]
+                                return (self$has(name) && (value %in% self$get(name)))
+                            })
+
+                        return(self$.eval(subed))
+
+                    } else {
+                        return(self$.eval(content))
+                    }
+
+                } else {
+
+                    nch <- nchar(value)
+                    if ( ! is.na(suppressWarnings(as.numeric(value))))
+                        value <- as.numeric(value)
+                    else
+                        value <- jmvcore::format(value, ...)
+
+                    if (is.character(value))
+                        base::Encoding(value) <- 'UTF-8'
+                }
+
                 if (length(names(vars)) > 0)
                     rm(list=names(vars), envir=private$.env)
             }
-            
+
             value
         },
         .eval=function(text) {
-            
+
             transformed <- gsub('\\$', '.', text)
             value <- try(base::eval(parse(text=transformed), envir=private$.env), silent=TRUE)
-            
+
             if (inherits(value, "try-error")) {
                 reason <- extractErrorMessage(value)
                 stop(format("Could not evaluate '{text}'\n    {reason}", text=text, reason=reason), call.=FALSE)
             }
-            
+
             value
         },
         set=function(...) {
-            
+
             values <- list(...)
             for (name in names(values))
                 private$.options[[name]]$value <- values[[name]]
-            
+
             for (listener in private$.listeners)
                 listener(names(values))
         },
         setValue=function(name, value) {
             private$.options[[name]]$value <- value
-            
+
             for (listener in private$.listeners)
                 listener(name)
         },
@@ -145,14 +213,14 @@ Options <- R6::R6Class(
         fromProtoBuf=function(pb) {
             if ( ! "Message" %in% class(pb))
                 reject("Group::fromProtoBuf(): expected a jamovi.coms.ResultsElement")
-            
+
             private$.pb <- pb
-            
+
             for (i in seq_along(pb$names)) {
                 name <- pb$names[[i]]
                 optionPB <- pb$options[[i]]
                 value <- parseOptionPB(optionPB)
-                
+
                 if (name == '.ppi') {
                     private$.ppi <- value
                 } else {
@@ -167,10 +235,10 @@ Options <- R6::R6Class(
                 name <- pb$names[[i]]
                 if ( ! name %in% names(private$.options))
                     next()
-                
+
                 optionPB <- pb$options[[i]]
                 currentValue <- private$.options[[name]]$value
-                
+
                 value <- parseOptionPB(optionPB)
                 clone <- private$.options[[name]]$clone(deep=TRUE)
                 clone$value <- value
@@ -196,6 +264,7 @@ Option <- R6::R6Class(
     "Option",
     private=list(
         .name=NA,
+        .title=NA,
         .parent=NA,
         .value=NA,
         .default=NA,
@@ -208,6 +277,7 @@ Option <- R6::R6Class(
 
             private$.parent <- NULL
             private$.name <- name
+            private$.title <- name
             self$value <- value
 
             args <- list(...)
@@ -218,8 +288,14 @@ Option <- R6::R6Class(
             }
         },
         check=function() {
-            data <- private$.parent$.getData()
+            if ( ! is.null(private$.parent))
+                data <- private$.parent$.getData()
+            else
+                data <- NULL
             private$.check(data)
+        },
+        getBoundValue=function(args) {
+            self$value
         },
         .setParent=function(parent) {
             private$.parent <- parent
@@ -243,6 +319,11 @@ Option <- R6::R6Class(
 OptionBool <- R6::R6Class(
     "OptionBool",
     inherit=Option,
+    public=list(
+        initialize=function(name, value=FALSE, ...) {
+            super$initialize(name, value, ...)
+        }
+    ),
     private=list(
         .check=function(data) {
             if (length(private$.value) == 1 &&
@@ -259,15 +340,72 @@ OptionBool <- R6::R6Class(
 OptionList <- R6::R6Class(
     "OptionList",
     inherit=Option,
+    public=list(
+        initialize=function(name, value, options, ...) {
+
+            if (length(options) == 0)
+                reject("OptionList '{}': at least one option must be provided", name, code=NULL)
+
+            if ('name' %in% names(options[[1]]))
+                options <- sapply(options, function(x) x$name)
+            else
+                options <- unlist(options)
+
+
+            if (missing(value) || is.null(value))
+                value <- options[1]
+
+            super$initialize(name, value, options=options, ...)
+        }
+    ),
     private=list(
         .options=NA,
+        .default=NA,
         .check=function(data) {
-            # if ( ! (private$.value %in% info$options)) {
-            #     options <- paste("'", info$options, "'", collapse=", ", sep="")
-            #     reject("Argument '{a}' must be one of {options}", code="a_must_be_one_of", a=info$name, options=options)
-            # }
+            if ( ! (private$.value %in% private$.options)) {
+                options <- paste("'", private$.options, "'", collapse=", ", sep="")
+                reject("Argument '{a}' must be one of {options}", code="a_must_be_one_of", a=self$name, options=options)
+            }
         }
     )
+)
+
+#' @rdname Options
+#' @export
+OptionNMXList <- R6::R6Class(
+    "OptionNMXList",
+    inherit=Option,
+    public=list(
+        initialize=function(name, value=character(), options, ...) {
+
+            if (length(options) == 0)
+                reject("OptionList '{}': at least one option must be provided", name, code=NULL)
+
+            if ('name' %in% names(options[[1]]))
+                options <- sapply(options, function(x) x$name)
+            options <- unlist(options)
+
+            super$initialize(name, value=value, options=options, ...)
+        }
+    ),
+    active=list(
+        value=function(v) {
+            if (base::missing(v))
+                return(private$.value)
+            private$.value <- unlist(v)
+            invisible(self)
+        }
+    ),
+    private=list(
+        .options=character(),
+        .default=character(),
+        .check=function(data) {
+            badValues <- private$.value[ ! (private$.value %in% private$.options)]
+            if (length(badValues) > 0) {
+                options <- paste0("'", private$.options, "'", collapse=', ')
+                reject("Argument '{a}' may only contain {options}", code="a_must_be_one_of", a=self$name, options=options)
+            }
+        })
 )
 
 #' @rdname Options
@@ -372,7 +510,22 @@ OptionInteger <- R6::R6Class(
 #' @export
 OptionNumber <- R6::R6Class(
     "OptionNumber",
-    inherit=Option)
+    inherit=Option,
+    private=list(
+        .min=-Inf,
+        .max=Inf,
+        .default=0
+    ),
+    public=list(
+        initialize=function(name, value=0, ...) {
+            super$initialize(name, value, ...)
+        },
+        check=function() {
+            value <- self$value
+            if (value > private$.max || value < private$.min)
+                reject('{title} must be between {min} and {max} (is {value})', title=private$.title, min=private$.min, max=private$.max, value=value)
+        }
+    ))
 
 #' @rdname Options
 #' @export
@@ -487,7 +640,7 @@ OptionArray <- R6::R6Class(
         .check=function(data) {
         },
         deep_clone=function(name, value) {
-            
+
             if (name == '.elements') {
                 elements <- list()
                 for (i in seq_along(value)) {
@@ -498,7 +651,7 @@ OptionArray <- R6::R6Class(
                 }
                 return(elements)
             }
-            
+
             value
         }
     ))
@@ -528,7 +681,7 @@ OptionPairs <- R6::R6Class(
         }))
 
 parseOptionPB <- function(pb) {
-    
+
     if (pb$has('i'))
         value <- pb$i
     else if (pb$has('d'))
@@ -536,10 +689,10 @@ parseOptionPB <- function(pb) {
     else if (pb$has('s'))
         value <- pb$s
     else if (pb$has('o')) {
-        
+
         # this isn't necessary, but without it the R linter complains :/
         jamovi.coms.AnalysisOption.Other <- eval(parse(text='jamovi.coms.AnalysisOption.Other'))
-        
+
         if (pb$o == jamovi.coms.AnalysisOption.Other$`TRUE`)
             value <- TRUE
         else if (pb$o == jamovi.coms.AnalysisOption.Other$`FALSE`)
@@ -556,6 +709,6 @@ parseOptionPB <- function(pb) {
     }
     else
         value <- NULL
-    
+
     value
 }

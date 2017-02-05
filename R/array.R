@@ -12,7 +12,8 @@ Array <- R6::R6Class("Array",
         .itemsValue=0),
     active=list(
         items=function() private$.items,
-        itemNames=function() private$.itemNames),
+        itemNames=function() private$.itemNames,
+        itemKeys=function() private$.itemKeys),
     public=list(
         initialize=function(
             options,
@@ -59,11 +60,20 @@ Array <- R6::R6Class("Array",
             private$.itemNames[[index]] <- rjson::toJSON(key)
             self$.createItem(key, index)
         },
+        isFilled=function() {
+            for (item in private$.items) {
+                if (item$visible && item$isNotFilled())
+                    return(FALSE)
+            }
+            TRUE
+        },
         .render=function(...) {
+            rendered <- FALSE
             if (self$visible) {
                 for (item in private$.items)
-                    item$.render(...)
+                    rendered <- item$.render(...) || rendered
             }
+            rendered
         },
         .update=function() {
 
@@ -199,10 +209,8 @@ Array <- R6::R6Class("Array",
 
             array <- RProtoBuf::new(jamovi.coms.ResultsArray)
 
-            for (item in private$.items) {
-                if (item$visible)
-                    array$add("elements", item$asProtoBuf(incAsText=incAsText, status=status))
-            }
+            for (item in private$.items)
+                array$add("elements", item$asProtoBuf(incAsText=incAsText, status=status))
 
             result <- super$asProtoBuf(incAsText=incAsText, status=status)
             result$array <- array

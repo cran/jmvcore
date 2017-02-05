@@ -1,10 +1,24 @@
 
+Note <- R6::R6Class('Note',
+    public=list(
+        key=NA,
+        note=NA,
+        init=NA,
+        initialize=function(key, note, init) {
+            self$key  <- key
+            self$note <- note
+            self$init <- init
+        }
+    )
+)
+
 #' @rdname Analysis
+#' @importFrom rjson fromJSON
 #' @export
 Table <- R6::R6Class("Table",
     inherit=ResultsElement,
     private=list(
-        .columns=list(),
+        .columns=NA,
         .rowCount=0,
         .rowKeys=character(),
         .rowNames=character(),
@@ -65,6 +79,9 @@ Table <- R6::R6Class("Table",
             notes=list(),
             swapRowsColumns=FALSE) {
 
+            if (missing(options))
+                options <- Options$new()
+
             super$initialize(
                 options=options,
                 name=name,
@@ -72,7 +89,12 @@ Table <- R6::R6Class("Table",
                 visible=visible,
                 clearWith=clearWith)
 
-            private$.notes <- notes
+            private$.notes <- list()
+            for (name in names(notes)) {
+                note <- notes[[name]]
+                self$setNote(name, note, init=TRUE)
+            }
+
             private$.swapRowsColumns <- swapRowsColumns
 
             private$.rowCount <- 0
@@ -88,6 +110,57 @@ Table <- R6::R6Class("Table",
 
             for (column in columns)
                 do.call(self$addColumn, column)
+        },
+        isFilled=function(col, rowNo, rowKey, excHidden=TRUE) {
+
+            cols <- integer()
+
+            if (missing(col)) {
+                cols <- seq_along(private$.columns)
+            } else if (is.character(col)) {
+                for (i in seq_along(private$.columns)) {
+                    column <- private$.columns[[i]]
+                    if (col == column$name) {
+                        cols <- i
+                        break()
+                    }
+                }
+                if (length(cols) == 0)
+                    reject("No such column: '{}'", col, code=NULL)
+            } else if (is.numeric(col)) {
+                cols <- col
+            } else {
+                stop('isFilled(): bad col argument')
+            }
+
+            rows <- integer()
+
+            if ( ! missing(rowNo)) {
+                rows <- rowNo
+            } else if ( ! missing(rowKey)) {
+                for (rowNo in seq_along(private$.rowKeys)) {
+                    if (base::identical(rowKey, private$.rowKeys[[rowNo]])) {
+                        rows <- rowNo
+                        break()
+                    }
+                }
+                if (length(rows) == 0)
+                    reject("No such row: '{}'", col, code=NULL)
+            } else {
+                rows <- seq_along(private$.rowKeys)
+            }
+
+            for (col in cols) {
+                column <- private$.columns[[col]]
+                if (excHidden && column$visible == FALSE)
+                    next()
+                for (row in rows) {
+                    if (self$getCell(rowNo=row, col=col)$isNotFilled())
+                        return(FALSE)
+                }
+            }
+
+            TRUE
         },
         .update=function() {
 
@@ -119,7 +192,7 @@ Table <- R6::R6Class("Table",
             oldKeys <- private$.rowKeys
             oldRows <- self$getRows()
 
-            self$clearRows()
+            self$deleteRows()
 
             for (i in seq_along(newKeys)) {
 
@@ -133,7 +206,7 @@ Table <- R6::R6Class("Table",
 
                 } else {
 
-                    self$addRow(newKey)
+                    self$addRow(newKey, list())
                 }
             }
 
@@ -143,7 +216,7 @@ Table <- R6::R6Class("Table",
             if ( ! is.null(error))
                 rethrow(error)
         },
-        clearRows=function() {
+        deleteRows=function() {
             private$.rowKeys <- list()
             for (column in private$.columns)
                 column$clear()
@@ -195,7 +268,7 @@ Table <- R6::R6Class("Table",
                 private$.columns <- newColumns
             }
         },
-        addRow=function(rowKey=NULL, values=NULL) {
+        addRow=function(rowKey, values=list()) {
 
             private$.rowKeys[length(private$.rowKeys)+1] <- list(rowKey)  # allow NULL
             private$.rowCount <- private$.rowCount + 1
@@ -214,9 +287,6 @@ Table <- R6::R6Class("Table",
             self$getCell(col=col, rowNo=rowNo, rowKey=rowKey)$addFormat(format)
         },
         setRow=function(values, rowNo=NA, rowKey=NULL) {
-
-            if ( ! is.na(rowNo) && rowNo == private$.rowCount + 1)
-                self$addRow(rowKey=rowNo, values)
 
             if (is.na(rowNo)) {
 
@@ -315,8 +385,15 @@ Table <- R6::R6Class("Table",
         addSymbol=function(col, symbol, rowNo=NA, rowKey=NULL) {
             self$getCell(col=col, rowNo=rowNo, rowKey=rowKey)$addSymbol(symbol)
         },
-        setNote=function(name, note) {
-            private$.notes[[name]] <- note
+        setNote=function(key, note, init=TRUE) {
+
+            if (is.null(note)) {
+                private$.notes[[key]] <- NULL
+            } else if (is.character(note)) {
+                private$.notes[[key]] <- Note$new(key, note[1], init)
+            } else {
+                stop('Table$setNote(): note must be a character vector', call.=FALSE)
+            }
         },
         .updateFootnotes=function() {
             if (private$.footnotesUpdated)
@@ -459,11 +536,11 @@ Table <- R6::R6Class("Table",
 
             pieces <- c(private$.marstr, repstr('\u2500', wid), private$.marstr, '\n')
 
-            for (i in seq_along(private$.notes)) {
+            for (note in private$.notes) {
 
-                note <- paste0('Note. ', private$.notes[[i]])
+                text <- paste0('Note. ', note$note)
 
-                lines <- strwrap(note,
+                lines <- strwrap(text,
                     width=(wid-private$.padding),
                     indent=private$.margin + private$.padding,
                     exdent=private$.margin + private$.padding)
@@ -551,12 +628,23 @@ Table <- R6::R6Class("Table",
             changes <- vChanges[vChanges %in% bound]
 
             tablePB <- element$table
+            columnsPB <- tablePB$columns
+
+            # we populate the protobuf cells into a list, because it leads to a
+            # significant performance improvement
+
+            cells <- list()
 
             columnPBIndicesByName <- list()
 
-            for (i in seq_along(tablePB$columns)) {
-                columnPB <- tablePB$columns[[i]]
+            for (i in seq_along(columnsPB)) {
+                columnPB <- columnsPB[[i]]
                 columnPBIndicesByName[[columnPB$name]] <- i
+                cellsPB <- columnPB$cells
+                colCells <- list()
+                for (j in seq_along(cellsPB))
+                    colCells[[j]] <- cellsPB[[j]]
+                cells[[i]] <- colCells
             }
 
             for (i in seq_along(private$.rowNames)) {
@@ -578,34 +666,36 @@ Table <- R6::R6Class("Table",
                         fromColIndex <- columnPBIndicesByName[[colName]]
 
                         if ( ! is.null(fromColIndex)) {
-                            fromCell <- tablePB$columns[[fromColIndex]]$cells[[fromRowIndex]]
+                            fromCell <- cells[[fromColIndex]][[fromRowIndex]]
                             toCell$fromProtoBuf(fromCell)
                         }
                     }
                 }
             }
 
-            for (note in tablePB$notes)
-                self$setNote(note$name, note$note)
+            for (note in tablePB$notes) {
+                if ( ! note$init)
+                    self$setNote(note$key, note$note, note$init)
+            }
         },
         asProtoBuf=function(incAsText=FALSE, status=NULL) {
             initProtoBuf()
 
             table <- RProtoBuf::new(jamovi.coms.ResultsTable)
 
-            for (column in private$.columns) {
-                if (column$visible)
-                    table$add("columns", column$asProtoBuf())
-            }
+            for (column in private$.columns)
+                table$add("columns", column$asProtoBuf())
 
             table$rowNames <- private$.rowNames
             table$swapRowsColumns <- private$.swapRowsColumns
 
-            for (i in seq_along(private$.notes)) {
-                noteName <- names(private$.notes)[[i]]
-                noteSays <- private$.notes[[i]]
-                note <- RProtoBuf::new(jamovi.coms.ResultsTableNote, name=noteName, note=noteSays)
-                table$add('notes', note)
+            for (note in private$.notes) {
+                notePB <- RProtoBuf::new(
+                    jamovi.coms.ResultsTableNote,
+                    key=note$key,
+                    note=note$note,
+                    init=note$init)
+                table$add('notes', notePB)
             }
 
             if (incAsText)

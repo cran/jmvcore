@@ -1,5 +1,6 @@
 
 #' the jmvcore Object classes
+#' @importFrom base64enc base64encode
 #' @export
 Analysis <- R6::R6Class("Analysis",
     private=list(
@@ -27,29 +28,37 @@ Analysis <- R6::R6Class("Analysis",
         .checkpoint=function(flush=TRUE) {
             if (is.null(private$.checkpointCB))
                 return()
+
+            results <- NULL
             if (flush)
-                private$.checkpointCB(RProtoBuf::serialize(self$asProtoBuf(), NULL))
-            else
-                private$.checkpointCB(NULL)
+                results <- RProtoBuf::serialize(self$asProtoBuf(), NULL)
+
+            cmd <- private$.checkpointCB(results)
+
+            if (is.character(cmd) && cmd == 'restart') {
+                self$setStatus('restarting')
+                stop(jmvcore::createError('restarting', 'restart'))
+            }
         },
         .sourcifyOption=function(option) {
             value <- option$value
             def <- option$default
-            
+
             if ( ! ((is.numeric(value) && isTRUE(all.equal(value, def))) || base::identical(value, def))) {
                 return(paste0(option$name, '=', sourcify(value, '    ')))
             }
             ''
         },
-        .asArgs=function() {
+        .asArgs=function(incData=TRUE) {
             source <- ''
             sep <- '\n    '
 
+            if (incData && self$options$requiresData) {
+                source <- paste0(sep, 'data=data')
+                sep <- paste0(',\n    ')
+            }
+
             for (option in private$.options$options) {
-
-                if (option$name == 'data')
-                    next()
-
                 as <- private$.sourcifyOption(option)
                 if ( ! base::identical(as, '')) {
                     source <- paste0(source, sep, as)
@@ -62,12 +71,24 @@ Analysis <- R6::R6Class("Analysis",
     active=list(
         analysisId=function() private$.analysisId,
         name=function() private$.name,
+        package=function() private$.package,
         data=function() private$.data,
         options=function() private$.options,
         results=function() private$.results,
         status=function() private$.status),
     public=list(
-        initialize=function(package, name, version, options, results, data=NULL, datasetId="", analysisId="", revision=0) {
+        initialize=function(
+            package,
+            name,
+            version,
+            options,
+            results,
+            pause=NULL,
+            data=NULL,
+            datasetId="",
+            analysisId="",
+            revision=0,
+            ...) {
 
             private$.package <- package
             private$.name    <- name
@@ -121,7 +142,7 @@ Analysis <- R6::R6Class("Analysis",
                 private$.status <- 'inited'
             }
         },
-        run=function(silent=FALSE) {
+        run=function(noThrow=FALSE) {
 
             if (private$.status != "inited")
                 self$init()
@@ -135,10 +156,8 @@ Analysis <- R6::R6Class("Analysis",
 
             private$.status <- "running"
 
-            if (silent) {
-                result <- try({
-                    private$.run()
-                })
+            if (noThrow) {
+                result <- try(private$.run(), silent=TRUE)
             } else {
                 result <- private$.run()
             }
@@ -146,13 +165,17 @@ Analysis <- R6::R6Class("Analysis",
             if (wasNull)
                 private$.data <- NULL
 
-            if (base::inherits(result, 'try-error')) {
+            if (private$.status == 'restarting') {
+                return(FALSE)  # FALSE means don't bother sending results
+            } else if (base::inherits(result, 'try-error')) {
                 errorMessage <- extractErrorMessage(result)
                 private$.results$setError(errorMessage)
                 private$.status <- 'error'
             } else {
                 private$.status <- 'complete'
             }
+
+            return(TRUE)
         },
         print=function() {
             cat(self$results$asString())
@@ -176,20 +199,23 @@ Analysis <- R6::R6Class("Analysis",
                 oChanges <- private$.options$compProtoBuf(pb$options)
                 private$.results$fromProtoBuf(pb$results, oChanges, vChanges)
             }
+
+            if (self$results$isFilled())
+                private$.status <- 'complete'
         },
         .render=function(funName, image, ppi=72, ...) {
 
             if ( ! is.null(image$path))
-                return()
+                return(FALSE)
 
             render <- private[[funName]]
 
             if (image$visible == FALSE)
-                return()
+                return(FALSE)
 
             if (is.function(render) == FALSE) {
                 image$.setPath(NULL)
-                return()
+                return(FALSE)
             }
 
             if (is.function(private$.resourcesPathSource)) {
@@ -241,6 +267,8 @@ Analysis <- R6::R6Class("Analysis",
 
                 image$.setPath(NULL)
             }
+
+            rendered
         },
         .setReadDatasetSource=function(read) {
             private$.readDataset <- read
@@ -306,33 +334,26 @@ Analysis <- R6::R6Class("Analysis",
             response$version$minor <- private$.version[2]
             response$version$revision <- private$.version[3]
             response$revision <- private$.revision
-            
-            overrideChildStatus <- NULL
-            
+
             if (private$.status == "inited") {
                 response$status <- jamovi.coms.AnalysisStatus$ANALYSIS_INITED;
             } else if (private$.status == "running") {
                 response$status <- jamovi.coms.AnalysisStatus$ANALYSIS_RUNNING;
             } else if (private$.status == "complete") {
                 response$status <- jamovi.coms.AnalysisStatus$ANALYSIS_COMPLETE;
-                
-                overrideChildStatus <- jamovi.coms.AnalysisStatus$ANALYSIS_COMPLETE;
-                
             } else {
                 error <- RProtoBuf::new(jamovi.coms.Error)
                 error$message <- private$.error
                 response$error <- error
                 response$status <- jamovi.coms.AnalysisStatus$ANALYSIS_ERROR;
-                
-                overrideChildStatus <- jamovi.coms.AnalysisStatus$ANALYSIS_COMPLETE;
             }
 
             if (incAsText) {
                 response$incAsText <- TRUE
                 syntax <- RProtoBuf::new(jamovi.coms.ResultsElement, name='syntax', syntax=self$asSource())
-                response$results <- self$results$asProtoBuf(incAsText=incAsText, status=overrideChildStatus, prepend=syntax);
+                response$results <- self$results$asProtoBuf(incAsText=incAsText, status=response$status, prepend=syntax);
             } else {
-                response$results <- self$results$asProtoBuf(incAsText=incAsText, status=overrideChildStatus);
+                response$results <- self$results$asProtoBuf(incAsText=incAsText, status=response$status);
             }
 
             if (incOptions)
@@ -341,6 +362,6 @@ Analysis <- R6::R6Class("Analysis",
             response
         },
         asSource=function() {
-            paste0(private$.package, '::', private$.name, '(\n    data=data, ', private$.asArgs(), ')')
+            paste0(private$.package, '::', private$.name, '(', private$.asArgs(), ')')
         })
 )

@@ -28,7 +28,7 @@ createError <- function(formats, code=NULL, ...) {
 }
 
 #' Determine if an object is an error
-#' 
+#'
 #' @param object the object to test
 #' @return TRUE if the object is an error
 #' @export
@@ -37,9 +37,9 @@ isError <- function(object) {
 }
 
 #' try an expression, and return NaN on failure
-#' 
+#'
 #' if the expression fails, NaN is returned silently
-#' 
+#'
 #' @param expr an expression to evaluate
 #' @return the result, or NaN on failure
 #' @export
@@ -51,7 +51,7 @@ tryNaN <- function(expr) {
 }
 
 #' Create and throw errors
-#' 
+#'
 #' These functions are convenience functions for creating and throwing errors.
 #' @param formats a format string which is passed to \code{\link{format}}
 #' @param code an error code
@@ -66,75 +66,77 @@ reject <- function(formats, code=NULL, ...) {
 composeTerm <- function(components) {
     components <- sapply(components, function(component) {
         if (make.names(component) != component) {
+            component <- gsub('\\', '\\\\', component, fixed=TRUE)
             component <- gsub('`', '\\`', component, fixed=TRUE)
             component <- paste0('`', component, '`')
         }
         component
-    })
+    }, USE.NAMES=FALSE)
+    term <- paste0(components, collapse=':')
+    term
 }
 
 #' @rdname decomposeTerm
 #' @export
 composeTerms <- function(listOfComponents) {
-    sapply(listOfComponents, composeTerm)
+    sapply(listOfComponents, composeTerm, USE.NAMES=FALSE)
 }
 
 #' Compose and decompose interaction terms to and from their components
-#' 
+#'
 #' @param components a character vectors of components
 #' @param listOfComponents a list of character vectors of components
 #' @param term a string with components separated with colons
 #' @param terms a character vector of components separated with colons
-#' 
+#'
 #' @examples
 #' composeTerm(c('a', 'b', 'c'))
 #' # 'a:b:c'
-#' 
+#'
 #' composeTerm(c('a', 'b', 'with space'))
 #' # 'a:b:`with space`'
-#' 
+#'
 #' decomposeTerm('a:b:c')
 #' # c('a', 'b', 'c')
-#' 
+#'
 #' decomposeTerm('a:b:`with space`')
 #' # c('a', 'b', 'with space')
-#' 
-#' @export 
+#'
+#' @export
 decomposeTerm <- function(term) {
-    
-    split <- strsplit(term, ':')[[1]]
+
+    chars <- strsplit(term, '')[[1]]
     components <- character()
-    component <- ''
-    
-    for (piece in split) {
-        if (component != '') {
-            component <- paste0(component, ':', piece)
-            if (endsWith(component, '\\`')) {
-                next()
-            }
-            else if (endsWith(component, '`')) {
-                component <- substring(component, 2, nchar(component)-1)
-                component <- gsub('\\`', '`', component, fixed=TRUE)
-                components <- c(components, component)
-                component <- ''
-            }
+    componentChars <- character()
+    inQuote <- FALSE
+
+    i <- 1
+    n <- length(chars)
+
+    while (i <= n) {
+        char <- chars[i]
+        if (char == '`') {
+            inQuote <- ! inQuote
         }
-        else if ( ! startsWith(piece, '`')) {
-            components <- c(components, piece)
+        else if (char == '\\') {
+            i <- i + 1
+            char <- chars[i]
+            componentChars <- c(componentChars, char)
         }
-        else if (endsWith(piece, '\\`')) {
-            component <- piece
-        }
-        else if (endsWith(piece, '`')) {
-            piece <- substring(piece, 2, nchar(piece)-1)
-            piece <- gsub('\\`', '`', piece, fixed=TRUE)
-            components <- c(components, piece)
+        else if (char == ':' && inQuote == FALSE) {
+            component <- paste0(componentChars, collapse='')
+            components <- c(components, component)
+            componentChars <- character()
         }
         else {
-            component <- piece
+            componentChars <- c(componentChars, char)
         }
+        i <- i + 1
     }
-    
+
+    component <- paste0(componentChars, collapse='')
+    components <- c(components, component)
+
     components
 }
 
@@ -148,30 +150,30 @@ decomposeTerms <- function(terms) {
 }
 
 #' Converts a term into a string
-#' 
+#'
 #' Converts a term (a vector of components) into a string for display purposes
-#' 
+#'
 #' @param components a character vector of components
 #' @param sep a separator to go between the components
 #' @return the components joined together into a string for disply
 #' @examples
 #' stringifyTerm(c('a', 'b', 'c'))
-#' 
+#'
 #' # "a:b:c"
-#' 
+#'
 #' stringifyTerm(c('a', 'b', 'c'), sep=' * ')
-#' 
+#'
 #' # "a * b * c"
-#' 
+#'
 #' options('jmvTermSep', ' * ')
 #' stringifyTerm(c('a', 'b', 'c'))
-#' 
+#'
 #' # "a * b * c"
-#' 
+#'
 #' #' stringifyTerm(c('`quoted`', 'b', 'c'))
-#' 
+#'
 #' # "quoted * b * c"
-#' 
+#'
 #' @export
 stringifyTerm <- function(components, sep=getOption('jmvTermSep', ':')) {
     components <- sapply(components, function(x) {
@@ -229,40 +231,40 @@ cap1st <- function(s) {
 }
 
 #' Format a string with arguments
-#' 
+#'
 #' Substitutes the arguments into the argument str. See the examples below.
-#' 
+#'
 #' @param str the format string
 #' @param ... the arguments to substitute into the string
 #' @param context 'normal' or 'R'
 #' @return the resultant string
-#' 
+#'
 #' @examples
-#' 
+#'
 #' jmvcore::format('the {} was delish', 'fish')
-#' 
+#'
 #' # 'the fish was delish'
-#' 
+#'
 #' jmvcore::format('the {} was more delish than the {}', 'fish', 'cow')
-#' 
+#'
 #' # 'the fish was more delish than the cow'
-#' 
+#'
 #' jmvcore::format('the {1} was more delish than the {0}', 'fish', 'cow')
-#' 
+#'
 #' # 'the cow was more delish than the fish'
-#' 
+#'
 #' jmvcore::format('the {what} and the {which}', which='fish', what='cow')
-#' 
+#'
 #' # 'the cow and the fish'
-#' 
+#'
 #' jmvcore::format('that is simply not {}', TRUE)
-#' 
+#'
 #' # 'that is simply not true'
-#' 
+#'
 #' jmvcore::format('that is simply not {}', TRUE, context='R')
-#' 
+#'
 #' # 'that is simply not TRUE'
-#' 
+#'
 #' @export
 format <- function(str, ..., context="normal") {
 
@@ -596,16 +598,16 @@ stringify <- function(value, context="normal") {
 #' @param terms list of character vectors making up the terms
 #' @return a string representation of the formula
 #' @examples
-#' 
+#'
 #' constructFormula(terms=list('a', 'b', c('a', 'b')))
 #' # a+b+a:b
-#' 
+#'
 #' constructFormula('f', list('a', 'b', c('a', 'b')))
 #' # "f~a+b+a:b"
-#' 
+#'
 #' constructFormula('with spaces', list('a', 'b', c('a', 'b')))
 #' '`with spaces`~a+b+a:b'
-#' 
+#'
 #' @export
 constructFormula <- function(dep=NULL, terms) {
     rhItems <- list()
@@ -629,7 +631,7 @@ constructFormula <- function(dep=NULL, terms) {
 }
 
 #' Test whether strings start or end with a particular string
-#' 
+#'
 #' Same as \code{base::startsWith()} and \code{base::endsWith()} except
 #' available for R < 3.3
 #' @param x a string to test
@@ -637,13 +639,13 @@ constructFormula <- function(dep=NULL, terms) {
 #' @param suffix a string to test the presence of
 #' @export
 startsWith <- function(x, prefix) {
-    return (substring(x, 1, 1) == prefix)
+    return (substring(x, 1, nchar(prefix)) == prefix)
 }
 
 #' @rdname startsWith
 #' @export
 endsWith <- function(x, suffix) {
-    return (substring(x, nchar(x)) == suffix)
+    return (substring(x, nchar(x) - nchar(suffix) + 1) == suffix)
 }
 
 isSame <- function(i1, i2) {
@@ -704,29 +706,29 @@ rethrow <- function(error) {
 #' @param object the object to convert to source
 #' @param indent the level of indentation to use
 #' @return a string of the equivalent source code
-#' 
+#'
 #' @examples
-#' 
+#'
 #' sourcify(NULL)
-#' 
+#'
 #' # 'NULL'
-#' 
+#'
 #' sourcify(c(1,2,3))
-#' 
+#'
 #' # 'c(1,2,3)'
-#' 
+#'
 #' l <- list(a=7)
 #' l[['b']] <- 3
 #' l[['c']] <- list(d=3, e=4)
 #' sourcify(l)
-#' 
+#'
 #' # 'list(
 #' #      a=7,
 #' #      b=3,
 #' #      c=list(
 #' #          d=3,
 #' #          e=4))'
-#' 
+#'
 #' @export
 sourcify <- function(object, indent='') {
 
@@ -829,7 +831,7 @@ sourcify <- function(object, indent='') {
 
 
 #' Create a new data frame with only the selected columns
-#' 
+#'
 #' Shorthand equivalent to \code{\link{subset}(df, select=columnNames)}, however
 #' it additionally preserves attributes on the columns
 #' @param df the data frame
@@ -837,7 +839,7 @@ sourcify <- function(object, indent='') {
 #' @return the new data frame
 #' @export
 select <- function(df, columnNames) {
-    
+
     out <- list()
     for (i in seq_along(columnNames)) {
         columnName <- unlist(columnNames[i])
@@ -850,23 +852,23 @@ select <- function(df, columnNames) {
 }
 
 #' remove missing values from a data frame listwise
-#' 
+#'
 #' removes all rows from the data frame which contain missing values (NA)
-#' 
+#'
 #' this function is equivalent to \code{\link{na.omit}} from the stats package,
 #' however it preserves attributes on columns in data frames
 #' @param object the object to remove missing values from
 #' @export
 naOmit <- function(object) {
-    
+
     if (is.data.frame(object)) {
-        
+
         attrList <- list()
         for (name in names(object))
             attrList[[name]] <- base::attributes(object[[name]])
-        
+
         object <- stats::na.omit(object)
-        
+
         for (name in names(attrList))
             base::attributes(object[[name]]) <- attrList[[name]]
     }
@@ -875,12 +877,12 @@ naOmit <- function(object) {
         object <- stats::na.omit(object)
         base::attributes(object) <- attrs
     }
-    
+
     object
 }
 
 #' Converts a vector of values to numeric
-#' 
+#'
 #' Similar to \code{\link{as.numeric}}, however if the object has a values
 #' attribute attached, these are used as the numeric values
 #' @param object the vector to convert
@@ -888,13 +890,13 @@ naOmit <- function(object) {
 toNumeric <- function(object) {
     if (is.numeric(object))
         return(object)
-    
+
     if ( ! is.null(base::attr(object, "values", TRUE))) {
         values <- base::attr(object, "values", TRUE)
         class(object) <- "factor"
         return(values[as.integer(object)])
     }
-    
+
     object
 }
 
@@ -905,4 +907,68 @@ canBeNumeric <- function(object) {
     is.numeric(object) || ! is.null(attr(object, "values", TRUE))
 }
 
+#' Convert names to and from Base64 encoding
+#'
+#' Note: uses the . and _ characters rather than + and / allowing these to be
+#' used as variable names
+#' @importFrom base64enc base64encode
+#' @param names the names to be converted base64
+#' @export
+toB64 <- function(names) {
+    sapply(names, function(name) {
+        name <- base64enc::base64encode(charToRaw(name))
+        if (endsWith(name, '=='))
+            name <- substring(name, 1, nchar(name)-2)
+        else if (endsWith(name, '='))
+            name <- substring(name, 1, nchar(name)-1)
+        name <- gsub('+', '.', name, fixed=TRUE)
+        name <- gsub('/', '_', name, fixed=TRUE)
+    }, USE.NAMES=FALSE)
+}
 
+#' @rdname toB64
+#' @importFrom base64enc base64decode
+#' @export
+fromB64 <- function(names) {
+    sapply(names, function(name) {
+        name <- gsub('.', '+', name, fixed=TRUE)
+        name <- gsub('_', '/', name, fixed=TRUE)
+        rawToChar(base64enc::base64decode(name))
+    }, USE.NAMES=FALSE)
+}
+
+extractRegexMatches <- function(text, match) {
+    match <- match[[1]]
+    extracted <- character()
+    starts   <- match
+    lengths  <- attr(match, 'match.length')
+    stops    <- starts + lengths - 1
+    for (i in seq_along(match)) {
+        piece <- substring(text, starts[i], stops[i])
+        extracted <- c(extracted, piece)
+    }
+    extracted
+}
+
+replaceRegexMatches <- function(text, match, pieces) {
+    match <- match[[1]]
+    starts   <- match
+    lengths  <- attr(match, 'match.length')
+    stops    <- starts + lengths - 1
+    for (i in rev(seq_along(match))) {
+        start  <- starts[i]
+        stop   <- stops[i]
+        piece  <- pieces[i]
+        before <- substring(text, 1, start - 1)
+        after  <- substring(text, stop + 1)
+        text <- paste0(before, piece, after)
+    }
+    text
+}
+
+regexSub <- function(pattern, text, fun) {
+    match <- gregexpr(pattern, text)
+    pieces <- extractRegexMatches(text, match)
+    pieces <- sapply(pieces, fun, USE.NAMES=FALSE)
+    replaceRegexMatches(text, match, pieces)
+}
