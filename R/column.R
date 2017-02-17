@@ -22,6 +22,9 @@ Column <- R6::R6Class("Column",
     active=list(
         name=function() private$.name,
         title=function() private$.title,
+        type=function() private$.type,
+        format=function() paste0(private$.format, collapse=','),
+        combineBelow=function() private$.combineBelow,
         cells=function() private$.cells,
         superTitle=function() private$.superTitle,
         hasSuperTitle=function() ( ! is.null(private$.superTitle)),
@@ -127,11 +130,12 @@ Column <- R6::R6Class("Column",
 
             p <- ('pvalue' %in% private$.format)
             zto <- ('zto' %in% private$.format)
+            pc <- ('pc' %in% private$.format)
 
             if (private$.type == "integer")
-                private$.measures <- measureElements(private$.cells, maxdp=0, type=private$.type, p=p, zto=zto)
+                private$.measures <- measureElements(private$.cells, maxdp=0, type=private$.type, p=p, zto=zto, pc=pc)
             else
-                private$.measures <- measureElements(private$.cells, type=private$.type, p=p, zto=zto)
+                private$.measures <- measureElements(private$.cells, type=private$.type, p=p, zto=zto, pc=pc)
 
             private$.width <- max(private$.measures$width, titleWidth)
             private$.measured <- TRUE
@@ -157,8 +161,9 @@ Column <- R6::R6Class("Column",
 
             p <- ('pvalue' %in% private$.format)
             zto <- ('zto' %in% private$.format)
+            pc <- ('pc' %in% private$.format)
 
-            formatElement(private$.cells[[i]],
+            v <- formatElement(private$.cells[[i]],
                 w=measures$width,
                 dp=measures$dp,
                 sf=measures$sf,
@@ -166,7 +171,25 @@ Column <- R6::R6Class("Column",
                 supw=measures$supwidth,
                 type=private$.type,
                 p=p,
-                zto=zto)
+                zto=zto,
+                pc=pc)
+
+            if (private$.combineBelow && i > 1) {
+                above <- formatElement(private$.cells[[i - 1]],
+                   w=measures$width,
+                   dp=measures$dp,
+                   sf=measures$sf,
+                   expw=measures$expwidth,
+                   supw=measures$supwidth,
+                   type=private$.type,
+                   p=p,
+                   zto=zto,
+                   pc=pc)
+                if (v == above)
+                    v <- repstr(' ', nchar(v))
+            }
+
+            return(v)
         },
         asProtoBuf=function() {
             initProtoBuf()
