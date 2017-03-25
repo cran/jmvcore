@@ -11,6 +11,7 @@ Analysis <- R6::R6Class("Analysis",
         .options=NA,
         .results=NA,
         .status="none",
+        .completeWhenFilled=FALSE,
         .init=function() NULL,
         .run=function() NULL,
         .readDataset=NA,
@@ -87,6 +88,7 @@ Analysis <- R6::R6Class("Analysis",
             datasetId="",
             analysisId="",
             revision=0,
+            completeWhenFilled=FALSE,
             ...) {
 
             private$.package <- package
@@ -99,6 +101,7 @@ Analysis <- R6::R6Class("Analysis",
             private$.analysisId <- analysisId
             private$.datasetId <- datasetId
             private$.revision <- revision
+            private$.completeWhenFilled <- completeWhenFilled
 
             private$.results$.parent <- self
             private$.options$analysis <- self
@@ -116,10 +119,14 @@ Analysis <- R6::R6Class("Analysis",
 
             wasNull <- FALSE
 
-            if (is.null(private$.data)) {
+            if ( ! self$options$requiresData) {
+                # do nothing
+            } else if (is.null(private$.data)) {
                 private$.data <- self$readDataset(TRUE)
                 wasNull <- TRUE
             } else {
+                if ( ! is.data.frame(private$.data))
+                    reject("Argument 'data' must be a data frame")
                 private$.data <- select(private$.data, self$options$varsRequired)
             }
 
@@ -130,8 +137,11 @@ Analysis <- R6::R6Class("Analysis",
                 private$.init()
             })
 
-            if (wasNull)
+            if ( ! self$options$requiresData) {
+                # do nothing
+            } else if (wasNull) {
                 private$.data <- NULL
+            }
 
             if (base::inherits(result, 'try-error')) {
                 errorMessage <- extractErrorMessage(result)
@@ -199,7 +209,7 @@ Analysis <- R6::R6Class("Analysis",
                 private$.results$fromProtoBuf(pb$results, oChanges, vChanges)
             }
 
-            if (self$results$isFilled())
+            if (isTRUE(private$.completeWhenFilled) && self$results$isFilled())
                 private$.status <- 'complete'
         },
         .render=function(funName, image, ppi=72, ...) {
@@ -359,6 +369,12 @@ Analysis <- R6::R6Class("Analysis",
                 response$options <- private$.options$asProtoBuf()
 
             response
+        },
+        serialize=function(incOptions=FALSE, incAsText=FALSE) {
+            serial <- try(RProtoBuf::serialize(self$asProtoBuf(incOptions=incOptions, incAsText=incAsText), NULL))
+            if (base::inherits(serial, 'try-error'))
+                return(raw())
+            serial
         },
         asSource=function() {
             paste0(private$.package, '::', private$.name, '(', private$.asArgs(), ')')

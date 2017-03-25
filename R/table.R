@@ -28,6 +28,8 @@ Table <- R6::R6Class("Table",
         .marstr=" ",
         .padstr="  ",
         .swapRowsColumns=FALSE,
+        .rowSelect='',
+        .sortSelect='',
         .footnotes=NA,
         .footnotesUpdated=FALSE,
         .notes=NA,
@@ -41,6 +43,7 @@ Table <- R6::R6Class("Table",
             value
         }),
     active=list(
+        names=function() private$.rowNames,
         rowKeys=function() private$.rowKeys,
         width=function() {
 
@@ -61,6 +64,26 @@ Table <- R6::R6Class("Table",
 
             max(w, nchar(self$title))
         },
+        rowSelected=function() {
+            if (private$.rowSelect != '') {
+                rowNo <- try(private$.options$eval(private$.rowSelect, silent=TRUE)+1)
+                if (inherits(rowNo, 'try-error'))
+                    rowNo <- 0
+            } else {
+                rowNo <- 0
+            }
+            rowNo
+        },
+        sortSelected=function() {
+            if (private$.sortSelect != '') {
+                sort <- try(private$.options$eval(private$.sortSelect, silent=TRUE))
+                if (inherits(sort, 'try-error'))
+                    sort <- NULL
+            } else {
+                sort <- NULL
+            }
+            sort
+        },
         footnotes=function() {
             private$.updateFootnotes()
             private$.footnotes
@@ -79,7 +102,9 @@ Table <- R6::R6Class("Table",
             columns=list(),
             rows=0,
             notes=list(),
-            swapRowsColumns=FALSE) {
+            swapRowsColumns=FALSE,
+            rowSelect='',
+            sortSelect='') {
 
             if (missing(options))
                 options <- Options$new()
@@ -90,6 +115,9 @@ Table <- R6::R6Class("Table",
                 title=title,
                 visible=visible,
                 clearWith=clearWith)
+
+            private$.rowSelect <- rowSelect
+            private$.sortSelect <- sortSelect
 
             private$.notes <- list()
             for (name in names(notes)) {
@@ -233,7 +261,8 @@ Table <- R6::R6Class("Table",
             content=NULL,
             type='number',
             format='',
-            combineBelow=FALSE) {
+            combineBelow=FALSE,
+            sortable=FALSE) {
 
             column <- Column$new(
                 options=private$.options,
@@ -244,7 +273,8 @@ Table <- R6::R6Class("Table",
                 content=content,
                 type=type,
                 format=format,
-                combineBelow=combineBelow)
+                combineBelow=combineBelow,
+                sortable=sortable)
 
             for (i in seq_len(private$.rowCount)) {
                 rowKey <- private$.rowKeys[[i]]
@@ -396,6 +426,12 @@ Table <- R6::R6Class("Table",
             } else {
                 stop('Table$setNote(): note must be a character vector', call.=FALSE)
             }
+        },
+        setSortKeys=function(col, keys) {
+            column <- private$.columns[[col]]
+            if (is.null(column))
+                reject("Table$setSortKeys(): col '{col}' not found", col=col)
+            column$setSortKeys(keys)
         },
         .updateFootnotes=function() {
             if (private$.footnotesUpdated)
@@ -632,6 +668,8 @@ Table <- R6::R6Class("Table",
             bound <- self$getBoundVars(private$.rowsExpr)
             changes <- vChanges[vChanges %in% bound]
 
+            super$fromProtoBuf(element)
+
             tablePB <- element$table
             columnsPB <- tablePB$columns
 
@@ -693,6 +731,8 @@ Table <- R6::R6Class("Table",
 
             table$rowNames <- private$.rowNames
             table$swapRowsColumns <- private$.swapRowsColumns
+            table$rowSelect <- substring(private$.rowSelect, 2, nchar(private$.rowSelect)-1)
+            table$rowSelected <- self$rowSelected - 1
 
             for (note in private$.notes) {
                 notePB <- RProtoBuf::new(
@@ -701,6 +741,19 @@ Table <- R6::R6Class("Table",
                     note=note$note,
                     init=note$init)
                 table$add('notes', notePB)
+            }
+
+            if ( ! identical(private$.sortSelect, '')) {
+                sortSelect <- substring(private$.sortSelect, 2, nchar(private$.sortSelect)-1)
+                table$sortSelect <- sortSelect
+                sort <- self$sortSelected
+                if ( ! identical(sort$sortBy, '')) {
+                    sortPB <- RProtoBuf::new(
+                        jamovi.coms.Sort,
+                        sortBy=sort$sortBy,
+                        sortDesc=sort$sortDesc)
+                    table$sortSelected <- sortPB
+                }
             }
 
             if (incAsText)
@@ -712,3 +765,29 @@ Table <- R6::R6Class("Table",
         }
     )
 )
+
+#' @export
+as.data.frame.Table <- function(x, row.names, optional, ...) {
+
+    df <- data.frame()
+    names <- character()
+
+    for (column in table$columns) {
+        if ( ! column$visible)
+            next()
+        names <- c(names, column$name)
+        values <- unlist(as.list(column), use.names=FALSE)
+        if (ncol(df) == 0) {
+            df <- data.frame(values)
+        } else {
+            df <- cbind(df, values)
+        }
+    }
+
+    colnames(df) <- names
+    rownames(df) <- table$rowNames
+
+    df
+}
+
+

@@ -98,6 +98,8 @@ Group <- R6::R6Class("Group",
             if (someChanges && base::identical('*', private$.clearWith))
                 return()
 
+            super$fromProtoBuf(pb)
+
             for (itemPB in pb$group$elements) {
                 itemName <- itemPB$name
                 target <- private$.items[[itemName]]
@@ -130,3 +132,18 @@ Group <- R6::R6Class("Group",
             result
         })
 )
+
+#' @export
+length.Group <- function(x) {
+    length(x$items)
+}
+
+#' @export
+names.Group <- function(x) {
+    x$itemNames
+}
+
+#' @export
+`[[.Group` <- function(group, i) {
+    group$get(i)
+}
