@@ -1,4 +1,4 @@
-d5672fa5db167533aaf9030df99b46ed *DESCRIPTION
+c3bce95f2db1469ec19a7c879d1e3826 *DESCRIPTION
 52cde5a8a35f553fdb184bf2ae0dd25e *NAMESPACE
 50dcfe016fb5fd793be44539933a4b3c *R/analysis.R
 41698669dc6c78e7c81e143b2c50d3b1 *R/array.R
@@ -14,7 +14,7 @@ bf9a8f1c3ee6322cb9183fb427cf04b4 *R/protobuf.R
 34b8a316ac8ce8446938d93cc683fad2 *R/results.R
 661625ffc5a1aaf3ee8d85332671cc6c *R/state.R
 2154a121e621c36a708424d438d8b3c7 *R/table-fold.R
-7a5ca969015cb3d621e74643212d4b79 *R/table.R
+c98adf56af7937190d608a59a24d46a3 *R/table.R
 ea4240f3a5167051e9a61b84f42df6a2 *R/utils.R
 cf0bf43faa04c8bd74a13a646ee10ef0 *inst/jamovi.proto
 3f313911f3ed87728fdd123d44321db8 *man/Analysis.Rd
@@ -38,4 +38,6 @@ b5cd3ab36cb625e879e74dc26c67996c *man/toNumeric.Rd
 dce8cc005080c3f658a4f1018950aeec *tests/testthat.R
 93978849b54e5f0d3151580245c31394 *tests/testthat/test-databinding.R
 cb0051b41648367489cc33c142ddcd82 *tests/testthat/test-options.R
+69f0815492dfaa134323c17ea5a99cd8 *tests/testthat/test-profiletable.R
+ce91a86dc2c0a53b334792a52070f98f *tests/testthat/test-table.R
 4c5a95acd1c65154f2202dfbdd865823 *tests/testthat/test-utils.R
