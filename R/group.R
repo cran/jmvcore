@@ -87,8 +87,8 @@ Group <- R6::R6Class("Group",
 
             if (noneVisible)
                 return('')
-            else
-                return(paste0(pieces, collapse=""))
+
+            utf8(paste0(pieces, collapse=""))
         },
         fromProtoBuf=function(pb, oChanges=NULL, vChanges=NULL) {
             if ( ! "Message" %in% class(pb))
@@ -108,26 +108,19 @@ Group <- R6::R6Class("Group",
                     target$fromProtoBuf(itemPB, oChanges, vChanges)
             }
         },
-        asProtoBuf=function(incAsText=FALSE, status=NULL, prepend=NULL) {
+        asProtoBuf=function(incAsText=FALSE, status=NULL, prepend=NULL, append=NULL) {
             initProtoBuf()
 
             group <- RProtoBuf::new(jamovi.coms.ResultsGroup)
 
-            if ( ! is.null(prepend))
-                group$add("elements", prepend)
+            for (prep in prepend)
+                group$add("elements", prep)
 
             for (item in private$.items)
                 group$add("elements", item$asProtoBuf(incAsText=incAsText, status=status))
 
             result <- super$asProtoBuf(incAsText=incAsText, status=status)
             result$group <- group
-
-            if (private$.status == 'error') {
-                error <- RProtoBuf::new(jamovi.coms.Error,
-                    message=private$.error)
-                result$error <- error
-                result$status <- jamovi.coms.AnalysisStatus$ANALYSIS_ERROR
-            }
 
             result
         })

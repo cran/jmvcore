@@ -8,6 +8,56 @@ ignore <- function(...) {
         warning(paste(paste0("Ignoring argument '", names(list(...)),"'"), collapse='\n'))
 }
 
+dontTry <- function(expr, ...) {
+    eval(expr)
+}
+
+#' @importFrom utils head
+tryStack <- function(expr, silent=FALSE) {
+    byref <- new.env()
+    result <- try(withCallingHandlers(
+        expr,
+        error=function(e) {
+            stack <- sys.calls()
+            stack <- stack[-(1:8)]
+            for (i in seq_along(stack)) {
+                call <- stack[i]
+                if (startsWith(call, 'withCallingHandlers(expr, error = function(e) {')) {
+                    stack <- stack[-(1:i)]
+                    break()
+                }
+            }
+            stack <- utils::head(stack, -2)
+            stack <- paste(stack, collapse='\n')
+            stack <- paste0(as.character(e), '\n', stack)
+            byref$stack <- stack
+        })
+    , silent=silent)
+    if (isError(result)) {
+        attr(result, 'stack') <- byref$stack
+    }
+    result
+}
+
+utf8 <- function(str) {
+    Encoding(str) <- 'UTF-8'
+    str
+}
+
+isValue <- function(value) {
+    if (is.null(value))
+        return(TRUE)
+    if ( ! is.atomic(value))
+        return(FALSE)
+    if (length(value) == 1)
+        return(TRUE)
+    return(FALSE)
+}
+
+isString <- function(value) {
+    (is.character(value) && length(value) == 1)
+}
+
 #' @rdname reject
 #' @export
 createError <- function(formats, code=NULL, ...) {
@@ -716,9 +766,13 @@ indexOf <- function(item, array) {
 #' @export
 extractErrorMessage <- function(error) {
 
-    split <- base::strsplit(as.character(error), ":")[[1]]
-    last <- split[[length(split)]]
-    base::trimws(last)
+    if (inherits(error, 'try-error'))
+        error <- attr(error, 'condition')
+
+    if (inherits(error, 'simpleError'))
+        return(error$message)
+
+    return('Unknown error')
 }
 
 rethrow <- function(error) {

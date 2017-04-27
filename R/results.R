@@ -87,6 +87,8 @@ ResultsElement <- R6::R6Class("ResultsElement",
             private$.index <- index
         },
         setStatus=function(status) {
+            if ( ! is.character(status) || length(status) != 1)
+                reject('setStatus(): status must be a string')
             private$.status <- status
         },
         setState=function(state) {
@@ -97,6 +99,8 @@ ResultsElement <- R6::R6Class("ResultsElement",
             private$.visibleValue <- visible
         },
         setTitle=function(title) {
+            if ( ! is.character(title) || length(title) != 1)
+                reject('setTitle(): title must be a string')
             private$.titleExpr <- title
             private$.titleValue <- title
         },
@@ -132,6 +136,8 @@ ResultsElement <- R6::R6Class("ResultsElement",
             paste0(".", name) %in% names(private)
         },
         setError = function(message) {
+            if ( ! is.character(message) || length(message) != 1)
+                reject('setError(): message must be a string')
             private$.error <- message
             private$.status <- 'error'
         },
@@ -159,7 +165,9 @@ ResultsElement <- R6::R6Class("ResultsElement",
             else
                 v <- jamovi.coms.Visible$DEFAULT_NO
 
-            if (self$isFilled())
+            if (private$.status == 'error')
+                s <- jamovi.coms.AnalysisStatus$ANALYSIS_ERROR
+            else if (self$isFilled())
                 s <- jamovi.coms.AnalysisStatus$ANALYSIS_COMPLETE
             else if (private$.status == 'running')
                 s <- jamovi.coms.AnalysisStatus$ANALYSIS_RUNNING
@@ -201,6 +209,13 @@ ResultsElement <- R6::R6Class("ResultsElement",
                 status=s,
                 visible=v)
 
+            if (private$.status == 'error') {
+                error <- RProtoBuf::new(jamovi.coms.Error,
+                                        message=private$.error)
+                element$error <- error
+                element$status <- jamovi.coms.AnalysisStatus$ANALYSIS_ERROR
+            }
+
             element
         },
         fromProtoBuf=function(pb, oChanges=NULL, vChanges=NULL) {
@@ -240,9 +255,14 @@ ResultsElement <- R6::R6Class("ResultsElement",
             if ( ! private$.options$has(optName))
                 return(NULL)
 
-            return(private$.options$get(optName))
+            value <- private$.options$get(optName)
+            value <- unlist(value, use.names=FALSE)
+            value <- unique(value)
+
+            value
         },
         print=function() {
+            self$.render()
             cat(self$asString())
         },
         .parent=NA))

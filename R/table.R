@@ -264,6 +264,23 @@ Table <- R6::R6Class("Table",
             combineBelow=FALSE,
             sortable=FALSE) {
 
+            if ( ! isString(name))
+                reject('Table$addColumn(): name must be a string')
+            if ( ! isString(title))
+                reject('Table$addColumn(): title must be a string')
+            if ( ! (is.numeric(index) || is.na(index)))
+                reject('Table$addColumn(): index must be a number')
+            if ( ! is.null(content) && ! isString(content))
+                reject('Table$addColumn(): content must be a string (or NULL)')
+            if ( ! isString(type))
+                reject('Table$addColumn(): type must be a string')
+            if ( ! isString(format))
+                reject('Table$addColumn(): format must be a string')
+            if ( ! is.logical(combineBelow))
+                reject('Table$addColumn(): combineBelow must be TRUE or FALSE')
+            if ( ! is.logical(sortable))
+                reject('Table$addColumn(): sortable must be TRUE or FALSE')
+
             column <- Column$new(
                 options=private$.options,
                 name=name,
@@ -302,6 +319,11 @@ Table <- R6::R6Class("Table",
         },
         addRow=function(rowKey, values=list()) {
 
+            for (value in values) {
+                if ( ! isValue(value))
+                    reject("Table$addRow(): value is not atomic", code='error')
+            }
+
             private$.rowKeys[length(private$.rowKeys)+1] <- list(rowKey)  # allow NULL
             private$.rowCount <- private$.rowCount + 1
             private$.rowNames <- sapply(private$.rowKeys, rjson::toJSON, USE.NAMES=FALSE)
@@ -335,14 +357,18 @@ Table <- R6::R6Class("Table",
                     reject("Table$setRow(): rowKey '{key}' not found", key=rowKey)
 
             } else if (rowNo > private$.rowCount) {
-                reject("Table$setCell(): rowNo {rowNo} > No. rows ({rowCount})", rowNo=rowNo, rowCount=private$.rowCount)
+                reject("Table$setRow(): rowNo {rowNo} > No. rows ({rowCount})", rowNo=rowNo, rowCount=private$.rowCount)
             }
 
             valueNames <- names(values)
 
             for (column in private$.columns) {
-                if (column$name %in% valueNames)
-                    self$setCell(rowNo=rowNo, col=column$name, values[[column$name]])
+                if (column$name %in% valueNames) {
+                    value <- values[[column$name]]
+                    if ( ! isValue(value))
+                        reject("Table$setRow(): value '{}' is not atomic", code='error', column$name)
+                    self$setCell(rowNo=rowNo, col=column$name, value)
+                }
             }
         },
         getColumn=function(col) {
@@ -517,7 +543,7 @@ Table <- R6::R6Class("Table",
             pieces <- c(pieces, self$.footerForPrint())
             pieces <- c(pieces, '\n')
 
-            paste0(pieces, collapse="")
+            utf8(paste0(pieces, collapse=""))
         },
         .titleForPrint=function() {
 
@@ -694,7 +720,8 @@ Table <- R6::R6Class("Table",
                 rowName <- private$.rowNames[[i]]
                 rowKey <- private$.rowKeys[[i]]
 
-                if ( ! is.na(indexOf(rowKey, changes)))
+                keyElems <- unlist(rowKey, use.names=FALSE)
+                if (any(keyElems %in% changes))
                     next()
 
                 fromRowIndex <- indexOf(rowName, tablePB$rowNames)

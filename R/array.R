@@ -160,8 +160,8 @@ Array <- R6::R6Class("Array",
 
             if (noneVisible)
                 return('')
-            else
-                return(paste0(pieces, collapse=""))
+
+            utf8(paste0(pieces, collapse=""))
         },
         fromProtoBuf=function(element, oChanges=NULL, vChanges=NULL) {
             if ( ! base::inherits(element, "Message"))
@@ -195,7 +195,8 @@ Array <- R6::R6Class("Array",
                 itemName <- private$.itemNames[[i]]
                 itemKey  <- private$.itemKeys[[i]]
 
-                if ( ! is.na(indexOf(itemKey, changes)))
+                keyElems <- unlist(itemKey, use.names=FALSE)
+                if (any(keyElems %in% changes))
                     next()
 
                 fromItemIndex <- arrayPBIndicesByName[[itemName]]
