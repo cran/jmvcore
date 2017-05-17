@@ -11,6 +11,7 @@ Options <- R6::R6Class(
         .pb=NA,
         .env=NA,
         .ppi=72,
+        .theme='default',
         .requiresData=TRUE),
     active=list(
         analysis=function(analysis) {
@@ -31,6 +32,7 @@ Options <- R6::R6Class(
         },
         names=function() names(private$.options),
         ppi=function() private$.ppi,
+        theme=function() private$.theme,
         options=function() private$.options),
     public=list(
         initialize=function(requiresData=TRUE, ...) {
@@ -45,7 +47,9 @@ Options <- R6::R6Class(
 
             args <- list(...)
             if ('.ppi' %in% names(args))
-                private$.ppi <- args$.ppi
+                private$.ppi <- args$ppi
+            if ('theme' %in% names(args))
+                private$.theme <- args$theme
 
             private$.env[["levels"]] <- self$levels
         },
@@ -218,7 +222,7 @@ Options <- R6::R6Class(
         },
         fromProtoBuf=function(pb) {
             if ( ! "Message" %in% class(pb))
-                reject("Group::fromProtoBuf(): expected a jamovi.coms.ResultsElement")
+                reject("Options::fromProtoBuf(): expected a jamovi.coms.ResultsElement")
 
             private$.pb <- pb
 
@@ -229,7 +233,9 @@ Options <- R6::R6Class(
 
                 if (name == '.ppi') {
                     private$.ppi <- value
-                } else {
+                } else if (name == 'theme') {
+                    private$.theme <- value
+                } else if (name %in% names(private$.options)) {
                     private$.options[[name]]$value <- value
                     private$.env[[name]] <- private$.options[[name]]$value
                 }
@@ -239,10 +245,17 @@ Options <- R6::R6Class(
             changes <- character()
             for (i in seq_along(pb$names)) {
                 name <- pb$names[[i]]
+                optionPB <- pb$options[[i]]
+
+                if (name == 'theme') {
+                    if ( ! identical(self$theme, parseOptionPB(optionPB)))
+                         changes <- c(changes, 'theme')
+                    next()
+                }
+
                 if ( ! name %in% names(private$.options))
                     next()
 
-                optionPB <- pb$options[[i]]
                 currentValue <- private$.options[[name]]$value
 
                 value <- parseOptionPB(optionPB)
@@ -741,4 +754,12 @@ parseOptionPB <- function(pb) {
         value <- NULL
 
     value
+}
+
+#' @export
+`$.Options` <- function(x, name) {
+    if ( ! exists(name, envir = x)) {
+        stop("options$", name, " does not exist", call.=FALSE)
+    }
+    x[[name]]
 }

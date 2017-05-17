@@ -23,6 +23,13 @@ Group <- R6::R6Class("Group",
                     return(TRUE)
             }
             return(FALSE)
+        },
+        asDF=function() {
+            children <- paste0('\n    ...$', self$itemNames, '$asDF', collapse='')
+            stop("This results group cannot be converted to a data frame.\n",
+                 "Perhaps you mean to access some of it's children:",
+                 children,
+                 call.=FALSE)
         }),
     public=list(
         initialize=function(
@@ -47,8 +54,20 @@ Group <- R6::R6Class("Group",
         .render=function(...) {
             rendered <- FALSE
             if (self$visible) {
-                for (item in private$.items)
-                    rendered <- item$.render(...) || rendered
+                for (item in private$.items) {
+                    if (item$visible)
+                        rendered <- item$.render(...) || rendered
+                }
+            }
+            rendered
+        },
+        .createImages=function(...) {
+            rendered <- FALSE
+            if (self$visible) {
+                for (item in private$.items) {
+                    if (item$visible)
+                        rendered <- item$.createImages(...) || rendered
+                }
             }
             rendered
         },
@@ -72,11 +91,24 @@ Group <- R6::R6Class("Group",
             for (item in private$.items)
                 item$.update()
         },
+        .lookup=function(path) {
+            if (length(path) == 0 || identical(path, ""))
+                return(self)
+
+            first <- path[ 1]
+            path  <- path[-1]
+
+            element <- self$get(first)
+            if (length(path) == 0)
+                return(element)
+            else
+                return(element$.lookup(path))
+        },
         asString=function() {
 
             noneVisible <- TRUE
 
-            pieces <- c('\n ', self$title, '\n')
+            pieces <- c('\n ', base::toupper(self$title), '\n')
 
             for (item in private$.items) {
                 if (item$visible) {
@@ -140,3 +172,30 @@ names.Group <- function(x) {
 `[[.Group` <- function(group, i) {
     group$get(i)
 }
+
+#' @export
+as.data.frame.Group <- function(x, ..., stringsAsFactors = default.stringsAsFactors()) {
+
+    call <- as.character(sys.call(-1)[2])
+    children <- paste0('\n    as.data.frame(', call, '$', x$itemNames, ')', collapse='')
+
+    stop('This results group cannot be converted to a data frame.\n',
+         'Perhaps you mean to access some of its children:',
+         children,
+         call.=FALSE)
+}
+
+#' @export
+#' @importFrom utils .DollarNames
+.DollarNames.Group <- function(x, pattern = "") {
+    names <- ls(x, all.names=F, pattern = pattern)
+    retain <- c(x$itemNames, 'asDF', 'asString')
+    names <- intersect(names, retain)
+    for (name in x$itemNames) {
+        item <- x$get(name)
+        if ( ! item$visible)
+            names <- setdiff(names, name)
+    }
+    names
+}
+

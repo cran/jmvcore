@@ -126,7 +126,10 @@ ResultsElement <- R6::R6Class("ResultsElement",
 
             private$.titleValue <- paste0(private$.options$eval(private$.titleExpr, .key=private$.key, .name=private$.name, .index=private$.index))
         },
-        .render=function(...) {
+        .createImages=function(...) {
+            FALSE
+        },
+        .render=function(image, ...) {
             FALSE
         },
         .optionsChanged=function(...) {
@@ -134,6 +137,9 @@ ResultsElement <- R6::R6Class("ResultsElement",
         },
         .has=function(name) {
             paste0(".", name) %in% names(private)
+        },
+        get=function(name) {
+            stop("This element does not support get()")
         },
         setError = function(message) {
             if ( ! is.character(message) || length(message) != 1)
@@ -266,3 +272,16 @@ ResultsElement <- R6::R6Class("ResultsElement",
             cat(self$asString())
         },
         .parent=NA))
+
+
+#' @export
+`$.ResultsElement` <- function(x, name) {
+    if ( ! exists(name, envir = x)) {
+        stop("'", name, "' does not exist in this results element", call.=FALSE)
+    }
+    classes <- class(x)
+    on.exit(class(x) <- classes)
+    class(x) <- 'environment'
+    property <- x[[name]]
+    property
+}

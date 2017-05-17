@@ -165,7 +165,7 @@ Analysis <- R6::R6Class("Analysis",
                 stack <- attr(result, 'stack')
                 self$setError(message, stack)
                 private$.status <- 'error'
-            } else {
+            } else if (private$.status != 'complete') {
                 private$.status <- 'inited'
             }
         },
@@ -210,9 +210,6 @@ Analysis <- R6::R6Class("Analysis",
         print=function() {
             cat(self$results$asString())
         },
-        render=function(noThrow=FALSE, ...) {
-            private$.results$.render(ppi=self$options$ppi, noThrow=noThrow, ...)
-        },
         .save=function() {
             path <- private$.statePathSource()
             pb <- self$asProtoBuf(incOptions=TRUE)
@@ -233,7 +230,32 @@ Analysis <- R6::R6Class("Analysis",
             if (isTRUE(private$.completeWhenFilled) && self$results$isFilled())
                 private$.status <- 'complete'
         },
-        .render=function(funName, image, ppi=72, noThrow=FALSE, ...) {
+        render=function() {
+            # deprecated
+        },
+        .render=function(funName, image, ...) {
+
+            if (image$requiresData && is.null(private$.data)) {
+                private$.data <- self$readDataset()
+                on.exit(private$.data <- NULL)
+            }
+
+            t <- themes[[self$options$theme]]
+            if (is.null(t))
+                t <- themes$default
+
+            ev <- parse(text=paste0('private$', funName, '(image, theme = t$theme, ggtheme = t$ggtheme, ...)'))
+            result <- eval(ev)
+
+            if (identical(result, FALSE))
+                stop('Rendering failed', call.=FALSE)
+
+            result
+        },
+        .createImages=function(noThrow=FALSE, ...) {
+            private$.results$.createImages(ppi=self$options$ppi, noThrow=noThrow, ...)
+        },
+        .createImage=function(funName, image, ppi=72, noThrow=FALSE, ...) {
 
             if ( ! is.null(image$path))
                 return(FALSE)
@@ -270,22 +292,28 @@ Analysis <- R6::R6Class("Analysis",
                     height=image$height * multip,
                     bg='transparent',
                     res=72 * multip)
+                on.exit(grDevices::dev.off())
             }
 
-            wasNull <- FALSE
-
+            dataRequired <- FALSE
             if (image$requiresData && is.null(private$.data)) {
-                wasNull <- TRUE
+                dataRequired <- TRUE
                 private$.data <- self$readDataset()
             }
-
 
             try <- dontTry
             if (noThrow)
                 try <- tryStack
 
-            ev <- parse(text=paste0('private$', funName, '(image)'))
+            t <- themes[[self$options$theme]]
+            if (is.null(t))
+                t <- themes$default
+
+            ev <- parse(text=paste0('private$', funName, '(image, theme = t$theme, ggtheme = t$ggtheme, ...)'))
             result <- try(eval(ev), silent=TRUE)
+
+            if (dataRequired)
+                private$.data <- NULL
 
             if (isError(result)) {
                 message <- extractErrorMessage(result)
@@ -295,12 +323,7 @@ Analysis <- R6::R6Class("Analysis",
                 result <- FALSE
             }
 
-            if (wasNull)
-                private$.data <- NULL
-
             if (is.function(private$.resourcesPathSource)) {
-
-                grDevices::dev.off()
 
                 if (result)
                     image$.setPath(paths$relPath)
@@ -351,6 +374,11 @@ Analysis <- R6::R6Class("Analysis",
                 RProtoBuf::serialize(self$results$asProtoBuf(), conn)
                 base::close(conn)
             }
+        },
+        .savePart=function(path, part, ...) {
+            partPath <- strsplit(part, '/', fixed=TRUE)[[1]]
+            element <- self$results$.lookup(partPath)
+            element$saveAs(path)
         },
         readDataset=function(headerOnly=FALSE) {
 

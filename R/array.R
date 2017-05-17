@@ -13,7 +13,14 @@ Array <- R6::R6Class("Array",
     active=list(
         items=function() private$.items,
         itemNames=function() private$.itemNames,
-        itemKeys=function() private$.itemKeys),
+        itemKeys=function() private$.itemKeys,
+        asDF=function() {
+            children <- paste0('\n    ...[[', 1:3, ']]$asDF', collapse='')
+            stop("This results array cannot be converted to a data frame.\n",
+                 "Perhaps you mean to access some of it's children:",
+                 children,
+                 call.=FALSE)
+        }),
     public=list(
         initialize=function(
             options,
@@ -66,6 +73,14 @@ Array <- R6::R6Class("Array",
                     return(FALSE)
             }
             TRUE
+        },
+        .createImages=function(...) {
+            rendered <- FALSE
+            if (self$visible) {
+                for (item in private$.items)
+                    rendered <- item$.createImages(...) || rendered
+            }
+            rendered
         },
         .render=function(...) {
             rendered <- FALSE
@@ -149,7 +164,7 @@ Array <- R6::R6Class("Array",
 
             noneVisible <- TRUE
 
-            pieces <- c('\n ', self$title, '\n')
+            pieces <- c('\n ', base::toupper(self$title), '\n')
 
             for (item in private$.items) {
                 if (item$visible) {
@@ -162,6 +177,19 @@ Array <- R6::R6Class("Array",
                 return('')
 
             utf8(paste0(pieces, collapse=""))
+        },
+        .lookup=function(path) {
+            if (length(path) == 0 || identical(path, ""))
+                return(self)
+
+            first <- path[1]
+            path  <- path[-1]
+
+            element <- self$get(name=first)
+            if (length(path) == 0)
+                return(element)
+            else
+                return(element$.lookup(path))
         },
         fromProtoBuf=function(element, oChanges=NULL, vChanges=NULL) {
             if ( ! base::inherits(element, "Message"))
@@ -235,4 +263,25 @@ names.Array <- function(x) {
         return(array$get(index=i))
     else
         return(array$get(name=i))
+}
+
+#' @export
+as.data.frame.Array <- function(x, ..., stringsAsFactors = default.stringsAsFactors()) {
+
+    call <- as.character(sys.call(-1)[2])
+    children <- paste0('\n    as.data.frame(', call, '[[', 1:3, ']])', collapse='')
+
+    stop('This results array cannot be converted to a data frame.\n',
+         'Perhaps you mean to access some of its children:',
+         children,
+         call.=FALSE)
+}
+
+#' @export
+#' @importFrom utils .DollarNames
+.DollarNames.Array <- function(x, pattern = "") {
+    names <- ls(x, all.names=F, pattern = pattern)
+    retain <- c('asDF', 'asString')
+    names <- intersect(names, retain)
+    names
 }
