@@ -27,28 +27,7 @@ Html <- R6::R6Class("Html",
         content=function(value) {
             if (base::missing(value))
                 return(private$.content)
-            knitted <- knitr::knit_print(value)
-
-            knitMeta <- attr(knitted, 'knit_meta')
-            if ( ! is.null(knitMeta)) {
-                knitMeta <- knitMeta[[1]]
-
-                package  <- self$analysis$package
-
-                srcPath  <- normalizePath(knitMeta$src$file)
-                rootPath <- normalizePath(system.file(package=package))
-                relPath  <- substring(srcPath, nchar(rootPath))
-
-                scripts <- sapply(knitMeta$script,     function(x) file.path(relPath, x), USE.NAMES=FALSE)
-                sss     <- sapply(knitMeta$stylesheet, function(x) file.path(relPath, x), USE.NAMES=FALSE)
-
-                private$.scripts <- scripts
-                private$.stylesheets <- sss
-            }
-
-            attributes(knitMeta) <- NULL
-            private$.content <- knitted
-            private$.stale <- FALSE
+            self$setContent(value)
             base::invisible(self)
         }
     ),
@@ -67,6 +46,37 @@ Html <- R6::R6Class("Html",
                 visible=visible,
                 clearWith=clearWith)
         },
+        setContent=function(value) {
+
+            knitted <- knitr::knit_print(value)
+
+            knitMeta <- attr(knitted, 'html_dependencies')
+            if ( ! is.null(knitMeta)) {
+                knitMeta <- knitMeta[[1]]
+
+                package  <- self$analysis$package
+
+                srcPath  <- normalizePath(knitMeta$src$file)
+                rootPath <- normalizePath(system.file(package=package))
+                relPath  <- substring(srcPath, nchar(rootPath)+1)
+
+                joinPaths <- function(path) {
+                    if (identical(relPath, ''))
+                        return(path)
+                    file.path(relPath, path)
+                }
+
+                scripts <- sapply(knitMeta$script,     joinPaths, USE.NAMES=FALSE)
+                sss     <- sapply(knitMeta$stylesheet, joinPaths, USE.NAMES=FALSE)
+
+                private$.scripts <- scripts
+                private$.stylesheets <- sss
+            }
+
+            attributes(knitMeta) <- NULL
+            private$.content <- knitted
+            private$.stale <- FALSE
+        },
         isFilled=function() {
             if (private$.stale)
                 return(FALSE)
@@ -77,7 +87,7 @@ Html <- R6::R6Class("Html",
         asString=function() {
             "\n  [No plain text representation available]\n\n"
         },
-        fromProtoBuf=function(element, oChanges=NULL, vChanges=NULL) {
+        fromProtoBuf=function(element, oChanges, vChanges) {
             if ( ! base::inherits(element, "Message"))
                 reject("Table$fromProtoBuf() expects a jamovi.coms.ResultsElement")
 
@@ -96,13 +106,12 @@ Html <- R6::R6Class("Html",
                     }
                 }
             }
-            super$fromProtoBuf(element)
+            super$fromProtoBuf(element, oChanges, vChanges)
             private$.content <- element$html$content
             private$.scripts <- element$html$scripts
             private$.stylesheets <- element$html$stylesheets
         },
         asProtoBuf=function(incAsText=FALSE, status=NULL) {
-            initProtoBuf()
             element <- super$asProtoBuf(incAsText=TRUE, status=status)
             element$html$content <- private$.content
             element$html$scripts <- private$.scripts

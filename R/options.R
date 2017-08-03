@@ -15,10 +15,9 @@ Options <- R6::R6Class(
         .requiresData=TRUE),
     active=list(
         analysis=function(analysis) {
-            if (base::missing(analysis))
+            if (missing(analysis))
                 return(private$.analysis)
             private$.analysis <- analysis
-            base::invisible(self)
         },
         requiresData=function() {
             private$.requiresData
@@ -27,7 +26,7 @@ Options <- R6::R6Class(
             vars <- list()
             for (option in private$.options)
                 vars <- c(vars, option$vars)
-            vars <- base::unique(vars)
+            vars <- unique(vars)
             vars
         },
         names=function() names(private$.options),
@@ -63,9 +62,9 @@ Options <- R6::R6Class(
                 return(NULL)
             private$.analysis$data
         },
-        check=function() {
+        check=function(checkVars=TRUE) {
             for (option in private$.options)
-                option$check()
+                option$check(checkVars)
         },
         values=function() {
             private$.env
@@ -101,8 +100,8 @@ Options <- R6::R6Class(
 
                         if (optionName == '$key') {
                             optionValue <- vars$.key
-                        } else if (self$has(optionName)) {
-                            optionValue <- self$get(optionName)
+                        } else if (self[['has']](optionName)) {
+                            optionValue <- self[['get']](optionName)
                         } else {
                             reject("Option '{}' does not exist, cannot be bound to", optionName, code=NULL)
                         }
@@ -110,10 +109,10 @@ Options <- R6::R6Class(
                         if (is.null(optionValue))
                             return(character())
 
-                        data <- self$.getData()
+                        data <- self[['.getData']]()
 
                         if (optionValue %in% colnames(data)) {
-                            return(base::levels(data[[optionValue]]))
+                            return(levels(data[[optionValue]]))
                         } else {
                             reject("Variable '{}' does not exist in the data", optionValue, code=NULL)
                         }
@@ -122,9 +121,9 @@ Options <- R6::R6Class(
 
                         return(vars$.key)
 
-                    } else if (self$has(content)) {
+                    } else if (self[['has']](content)) {
 
-                        return(self$get(content))
+                        return(self[['get']](content))
 
                     } else if (grepl('[A-Za-z][A-Za-z0-9]*:[A-Za-z][A-Za-z0-9]*', content)) {
 
@@ -135,14 +134,14 @@ Options <- R6::R6Class(
                                 split <- strsplit(x, ':')[[1]]
                                 name  <- split[1]
                                 value <- split[2]
-                                return (self$has(name) && (value %in% self$get(name)))
+                                return (self[['has']](name) && (value %in% self[['get']](name)))
                             })
 
-                        return(self$.eval(subed))
+                        return(self[['.eval']](subed))
 
                     } else {
 
-                        value <- try({ self$.eval(content) })
+                        value <- try({ self[['.eval']](content) })
                         if (inherits(value, 'try-error')) {
                             message <- jmvcore::format("Could not resolve '{}'", content)
                             stop(message, call.=FALSE)
@@ -159,7 +158,7 @@ Options <- R6::R6Class(
                         value <- jmvcore::format(value, ...)
 
                     if (is.character(value))
-                        base::Encoding(value) <- 'UTF-8'
+                        Encoding(value) <- 'UTF-8'
                 }
 
                 if (length(names(vars)) > 0)
@@ -171,7 +170,7 @@ Options <- R6::R6Class(
         .eval=function(text) {
 
             transformed <- gsub('\\$', '.', text)
-            value <- try(base::eval(parse(text=transformed), envir=private$.env), silent=TRUE)
+            value <- try(eval(parse(text=transformed), envir=private$.env), silent=TRUE)
 
             if (inherits(value, "try-error")) {
                 reason <- extractErrorMessage(value)
@@ -262,14 +261,14 @@ Options <- R6::R6Class(
                 clone <- private$.options[[name]]$clone(deep=TRUE)
                 clone$value <- value
                 oldValue <- clone$value
-                if ( ! base::identical(currentValue, oldValue))
+                if ( ! identical(currentValue, oldValue))
                     changes <- c(changes, name)
             }
             changes
         },
         fromJSON=function(json) {
             private$.json <- json
-            opts <- rjson::fromJSON(json)
+            opts <- fromJSON(json)
             for (name in names(opts)) {
                 value <- opts[[name]]
                 private$.options[[name]]$value <- value
@@ -287,7 +286,7 @@ Option <- R6::R6Class(
         .parent=NA,
         .value=NA,
         .default=NA,
-        .check=function(data){},
+        .check=function(data, checkVars){},
         deep_clone=function(name, value) {
             value
         }),
@@ -306,12 +305,12 @@ Option <- R6::R6Class(
                     private[[pname]] <- args[[name]]
             }
         },
-        check=function() {
+        check=function(checkVars=TRUE) {
             if ( ! is.null(private$.parent))
                 data <- private$.parent$.getData()
             else
                 data <- NULL
-            private$.check(data)
+            private$.check(data, checkVars)
         },
         getBoundValue=function(args) {
             self$value
@@ -327,10 +326,9 @@ Option <- R6::R6Class(
         default=function() private$.default,
         vars=function() NULL,
         value=function(value) {
-            if (base::missing(value))
+            if (missing(value))
                 return(private$.value)
             private$.value <- value
-            base::invisible(self)
         }))
 
 #' @rdname Options
@@ -344,7 +342,7 @@ OptionBool <- R6::R6Class(
         }
     ),
     private=list(
-        .check=function(data) {
+        .check=function(data, checkVars) {
             if (length(private$.value) == 1 &&
                 private$.value != FALSE &&
                 private$.value != TRUE)
@@ -380,7 +378,7 @@ OptionList <- R6::R6Class(
     private=list(
         .options=NA,
         .default=NA,
-        .check=function(data) {
+        .check=function(data, checkVars) {
             if ( ! (private$.value %in% private$.options)) {
                 options <- paste("'", private$.options, "'", collapse=", ", sep="")
                 reject("Argument '{a}' must be one of {options}", code="a_must_be_one_of", a=self$name, options=options)
@@ -411,16 +409,15 @@ OptionNMXList <- R6::R6Class(
     ),
     active=list(
         value=function(v) {
-            if (base::missing(v))
+            if (missing(v))
                 return(private$.value)
             private$.value <- unlist(v)
-            invisible(self)
         }
     ),
     private=list(
         .options=character(),
         .default=character(),
-        .check=function(data) {
+        .check=function(data, checkVars) {
             badValues <- private$.value[ ! (private$.value %in% private$.options)]
             if (length(badValues) > 0) {
                 options <- paste0("'", private$.options, "'", collapse=', ')
@@ -437,16 +434,15 @@ OptionVariables <- R6::R6Class(
     active=list(
         vars=function() private$.value,
         value=function(value) {
-            if (base::missing(value))
+            if (missing(value))
                 return(private$.value)
             private$.value <- unlist(value)
-            base::invisible(self)
         }),
     private=list(
         .rejectInf=TRUE,
         .rejectMissing=FALSE,
         .permitted=NA,
-        .check=function(data) {
+        .check=function(data, checkVars) {
 
             value <- private$.value
 
@@ -455,6 +451,9 @@ OptionVariables <- R6::R6Class(
 
             if (is.character(value) == FALSE && is.list(value) == FALSE)
                 reject("Argument '{a}' must be a character vector", code="a_is_not_a_string", a=self$name)
+
+            if ( ! checkVars)
+                return()
 
             notInDataset <- value[ ! (value %in% names(data))]
             if (length(notInDataset) == 1) {
@@ -535,16 +534,16 @@ OptionNumber <- R6::R6Class(
     private=list(
         .min=-Inf,
         .max=Inf,
-        .default=0
+        .default=0,
+        .check=function(data, checkVars) {
+            value <- self$value
+            if (value > private$.max || value < private$.min)
+                reject('{title} must be between {min} and {max} (is {value})', title=private$.title, min=private$.min, max=private$.max, value=value)
+        }
     ),
     public=list(
         initialize=function(name, value=0, ...) {
             super$initialize(name, value, ...)
-        },
-        check=function() {
-            value <- self$value
-            if (value > private$.max || value < private$.min)
-                reject('{title} must be between {min} and {max} (is {value})', title=private$.title, min=private$.min, max=private$.max, value=value)
         }
     ))
 
@@ -571,7 +570,7 @@ OptionGroup <- R6::R6Class(
     ),
     active=list(
         value=function(value) {
-            if (base::missing(value)) {
+            if (missing(value)) {
                 value <- list()
                 for (o in private$.elements)
                     value[o$name] <- list(o$value)
@@ -579,7 +578,6 @@ OptionGroup <- R6::R6Class(
             }
             for (name in names(value))
                 private$.elements[[name]]$value <- value[[name]]
-            base::invisible(self)
         }, vars=function() {
             vars <- list()
             for (element in private$.elements)
@@ -588,7 +586,7 @@ OptionGroup <- R6::R6Class(
         }),
     private=list(
         .elements=NA,
-        .check=function(data) {
+        .check=function(data, checkVars) {
             for (option in private$.elements)
                 option$check()
         },
@@ -645,7 +643,7 @@ OptionArray <- R6::R6Class(
         }),
     active=list(
         value=function(values) {
-            if (base::missing(values)) {
+            if (missing(values)) {
                 if (private$.isNull)
                     return(NULL)
                 values <- list()
@@ -668,7 +666,6 @@ OptionArray <- R6::R6Class(
                     private$.elements[[length(private$.elements)+1]] <- clone
                 }
             }
-            base::invisible(self)
         },
         vars=function() {
             vars <- list()
@@ -680,7 +677,7 @@ OptionArray <- R6::R6Class(
         .template=NA,
         .elements=NA,
         .isNull=TRUE,
-        .check=function(data) {
+        .check=function(data, checkVars) {
         },
         deep_clone=function(name, value) {
 

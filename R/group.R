@@ -37,14 +37,16 @@ Group <- R6::R6Class("Group",
             name=NULL,
             title='no title',
             visible=TRUE,
-            clearWith=NULL) {
+            clearWith=NULL,
+            refs=list()) {
 
             super$initialize(
                 options=options,
                 name=name,
                 title=title,
                 visible=visible,
-                clearWith=clearWith)
+                clearWith=clearWith,
+                refs=refs)
 
             private$.items <- list()
         },
@@ -122,7 +124,7 @@ Group <- R6::R6Class("Group",
 
             utf8(paste0(pieces, collapse=""))
         },
-        fromProtoBuf=function(pb, oChanges=NULL, vChanges=NULL) {
+        fromProtoBuf=function(pb, oChanges, vChanges) {
             if ( ! "Message" %in% class(pb))
                 reject("Group::fromProtoBuf(): expected a jamovi.coms.ResultsElement")
 
@@ -130,7 +132,7 @@ Group <- R6::R6Class("Group",
             if (someChanges && base::identical('*', private$.clearWith))
                 return()
 
-            super$fromProtoBuf(pb)
+            super$fromProtoBuf(pb, oChanges, vChanges)
 
             for (itemPB in pb$group$elements) {
                 itemName <- itemPB$name
@@ -141,8 +143,6 @@ Group <- R6::R6Class("Group",
             }
         },
         asProtoBuf=function(incAsText=FALSE, status=NULL, prepend=NULL, append=NULL) {
-            initProtoBuf()
-
             group <- RProtoBuf::new(jamovi.coms.ResultsGroup)
 
             for (prep in prepend)

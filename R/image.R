@@ -43,6 +43,10 @@ Image <- R6::R6Class("Image",
 
             private$.path <- NULL
         },
+        setSize=function(width, height) {
+            private$.width  <- width
+            private$.height <- height
+        },
         isFilled=function() {
             if (private$.stale)
                 return(FALSE)
@@ -120,28 +124,32 @@ Image <- R6::R6Class("Image",
             utf8(paste0(pieces, collapse=""))
         },
         asProtoBuf=function(incAsText=FALSE, status=NULL) {
-            initProtoBuf()
 
             path <- private$.path
             if (is.null(path))
                 path=''
 
-            image <- RProtoBuf::new(jamovi.coms.ResultsImage,
+            image <- RProtoBuf_new(jamovi.coms.ResultsImage,
                 width=private$.width,
                 height=private$.height,
                 path=path)
 
             result <- super$asProtoBuf(incAsText=incAsText, status=status)
 
-            if (status == jamovi.coms.AnalysisStatus$ANALYSIS_COMPLETE &&
+            if (self$isFilled()) {
+
+                result$status <- jamovi.coms.AnalysisStatus$ANALYSIS_COMPLETE
+
+            } else if (status == jamovi.coms.AnalysisStatus$ANALYSIS_COMPLETE &&
                 ( ! is.null(self$state)) &&
-                path == '')
+                path == '') {
                     result$status <- jamovi.coms.AnalysisStatus$ANALYSIS_RENDERING
+            }
 
             result$image <- image
             result
         },
-        fromProtoBuf=function(element, oChanges=NULL, vChanges=NULL) {
+        fromProtoBuf=function(element, oChanges, vChanges) {
             if ( ! base::inherits(element, "Message"))
                 reject("Image$fromProtoBuf() expects a jamovi.coms.ResultsElement")
 
@@ -157,7 +165,7 @@ Image <- R6::R6Class("Image",
                     return()
             }
 
-            super$fromProtoBuf(element)
+            super$fromProtoBuf(element, oChanges, vChanges)
 
             image <- element$image
 

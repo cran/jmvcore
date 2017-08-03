@@ -97,14 +97,14 @@ Array <- R6::R6Class("Array",
 
             super$.update()
 
-            if (length(private$.template) == 0)
+            if (is.null(private$.template))
                 return()
 
             error <- NULL
 
             newKeys <- try(private$.options$eval(private$.itemsExpr, .key=private$.key, .name=private$.name, .index=private$.index), silent=TRUE)
 
-            if (base::inherits(newKeys, "try-error")) {
+            if (inherits(newKeys, "try-error")) {
                 error <- newKeys
                 newKeys <- list()
             } else if (is.list(newKeys)) {
@@ -148,6 +148,13 @@ Array <- R6::R6Class("Array",
 
             item <- private$.template$clone(deep=TRUE)
             item$.parent <- self
+
+            if (inherits(item, 'Group')) {
+                for (child in item$items) {
+                    child$.parent <- item
+                }
+            }
+
             item$.setKey(key, index)
             item$.update()
 
@@ -191,7 +198,7 @@ Array <- R6::R6Class("Array",
             else
                 return(element$.lookup(path))
         },
-        fromProtoBuf=function(element, oChanges=NULL, vChanges=NULL) {
+        fromProtoBuf=function(element, oChanges, vChanges) {
             if ( ! base::inherits(element, "Message"))
                 reject("Array$fromProtoBuf() expects a jamovi.coms.ResultsElement")
 
@@ -229,14 +236,16 @@ Array <- R6::R6Class("Array",
 
                 fromItemIndex <- arrayPBIndicesByName[[itemName]]
                 if ( ! is.null(fromItemIndex)) {
-                    private$.items[[i]]$fromProtoBuf(arrayPB$elements[[fromItemIndex]], oChanges, vChanges)
+
+                    item <- private$.items[[i]]
+                    elementPB <- arrayPB$elements[[fromItemIndex]]
+                    item$fromProtoBuf(elementPB, oChanges, vChanges)
                 }
             }
         },
         asProtoBuf=function(incAsText=FALSE, status=NULL) {
-            initProtoBuf()
 
-            array <- RProtoBuf::new(jamovi.coms.ResultsArray)
+            array <- RProtoBuf_new(jamovi.coms.ResultsArray)
 
             for (item in private$.items)
                 array$add("elements", item$asProtoBuf(incAsText=incAsText, status=status))

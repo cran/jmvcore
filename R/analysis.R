@@ -32,7 +32,7 @@ Analysis <- R6::R6Class("Analysis",
 
             results <- NULL
             if (flush)
-                results <- RProtoBuf::serialize(self$asProtoBuf(), NULL)
+                results <- RProtoBuf_serialize(self$asProtoBuf(), NULL)
 
             cmd <- private$.checkpointCB(results)
 
@@ -45,8 +45,11 @@ Analysis <- R6::R6Class("Analysis",
             value <- option$value
             def <- option$default
 
+            if (option$name == 'data')
+                return('data = data')
+
             if ( ! ((is.numeric(value) && isTRUE(all.equal(value, def))) || base::identical(value, def))) {
-                return(paste0(option$name, '=', sourcify(value, '    ')))
+                return(paste0(option$name, ' = ', sourcify(value, '    ')))
             }
             ''
         },
@@ -55,7 +58,8 @@ Analysis <- R6::R6Class("Analysis",
             sep <- '\n    '
 
             if (incData && self$options$requiresData) {
-                source <- paste0(sep, 'data=data')
+                as <- private$.sourcifyOption(list(name='data', value='data'))
+                source <- paste0(sep, as)
                 sep <- paste0(',\n    ')
             }
 
@@ -113,8 +117,8 @@ Analysis <- R6::R6Class("Analysis",
 
             private$.checkpointCB <- NULL
         },
-        check=function() {
-            private$.options$check()
+        check=function(checkVars=TRUE) {
+            private$.options$check(checkVars=checkVars)
         },
         setStatus=function(status) {
             private$.status <- status
@@ -148,8 +152,9 @@ Analysis <- R6::R6Class("Analysis",
                     private$.data <- select(private$.data, self$options$varsRequired)
                 }
 
-                self$options$check()
+                self$options$check(checkVars=FALSE)  # don't check vars till after the .update()
                 self$results$.update()
+                self$options$check()
 
                 private$.init()
             }, silent=TRUE)
@@ -213,7 +218,7 @@ Analysis <- R6::R6Class("Analysis",
         .save=function() {
             path <- private$.statePathSource()
             pb <- self$asProtoBuf(incOptions=TRUE)
-            RProtoBuf::serialize(pb, path)
+            RProtoBuf_serialize(pb, path)
         },
         .load=function(vChanges=character()) {
 
@@ -222,7 +227,7 @@ Analysis <- R6::R6Class("Analysis",
             path <- private$.statePathSource()
 
             if (base::file.exists(path)) {
-                pb <- RProtoBuf::read(jamovi.coms.AnalysisResponse, path)
+                pb <- RProtoBuf_read(jamovi.coms.AnalysisResponse, path)
                 oChanges <- private$.options$compProtoBuf(pb$options)
                 private$.results$fromProtoBuf(pb$results, oChanges, vChanges)
             }
@@ -321,11 +326,17 @@ Analysis <- R6::R6Class("Analysis",
                 self$setError(message, stack)
                 private$.status <- 'error'
                 result <- FALSE
+            } else if (identical(result, TRUE)) {
+                # do nothing
+            } else if (identical(result, FALSE)) {
+                # do nothing
+            } else {
+                result <- FALSE
             }
 
             if (is.function(private$.resourcesPathSource)) {
 
-                if (result)
+                if (isTRUE(result))
                     image$.setPath(paths$relPath)
                 else
                     image$.setPath(NULL)
@@ -356,12 +367,12 @@ Analysis <- R6::R6Class("Analysis",
             try({
                 if (is.function(private$.statePathSource)) {
                     statePath <- private$.statePathSource()
-                    if (base::file.exists(statePath)) {
+                    if (file.exists(statePath)) {
                         conn <- file(statePath, open="rb", raw=TRUE)
-                        pb <- RProtoBuf::read(jamovi.coms.ResultsElement, conn)
-                        base::close(conn)
+                        pb <- RProtoBuf_read(jamovi.coms.ResultsElement, conn)
+                        close(conn)
 
-                        self$results$fromProtoBuf(pb)
+                        self$results$fromProtoBuf(pb, NULL, NULL)
                     }
                 }
             })
@@ -371,8 +382,8 @@ Analysis <- R6::R6Class("Analysis",
             if (is.function(private$.statePathSource)) {
                 statePath <- private$.statePathSource()
                 conn <- file(statePath, open="wb", raw=TRUE)
-                RProtoBuf::serialize(self$results$asProtoBuf(), conn)
-                base::close(conn)
+                RProtoBuf_serialize(self$results$asProtoBuf(), conn)
+                close(conn)
             }
         },
         .savePart=function(path, part, ...) {
@@ -397,7 +408,7 @@ Analysis <- R6::R6Class("Analysis",
             self$init()
             initProtoBuf()
 
-            response <- RProtoBuf::new(jamovi.coms.AnalysisResponse)
+            response <- RProtoBuf_new(jamovi.coms.AnalysisResponse)
             response$datasetId  <- private$.datasetId
             response$analysisId <- self$analysisId
             response$name <- private$.name
@@ -419,11 +430,11 @@ Analysis <- R6::R6Class("Analysis",
 
             prepend <- list()
             if ( ! identical(private$.stacktrace, ''))
-                prepend[[length(prepend)+1]] <- RProtoBuf::new(jamovi.coms.ResultsElement, name='debug', title='Debug', preformatted=private$.stacktrace)
+                prepend[[length(prepend)+1]] <- RProtoBuf_new(jamovi.coms.ResultsElement, name='debug', title='Debug', preformatted=private$.stacktrace)
 
             if (incAsText) {
                 response$incAsText <- TRUE
-                syntax <- RProtoBuf::new(jamovi.coms.ResultsElement, name='syntax', preformatted=self$asSource())
+                syntax <- RProtoBuf_new(jamovi.coms.ResultsElement, name='syntax', preformatted=self$asSource())
                 prepend <- c(list(syntax), prepend)
                 response$results <- self$results$asProtoBuf(incAsText=incAsText, status=response$status, prepend=prepend);
             } else {
@@ -436,7 +447,7 @@ Analysis <- R6::R6Class("Analysis",
             response
         },
         serialize=function(incOptions=FALSE, incAsText=FALSE) {
-            serial <- tryStack(RProtoBuf::serialize(self$asProtoBuf(incOptions=incOptions, incAsText=incAsText), NULL))
+            serial <- tryStack(RProtoBuf_serialize(self$asProtoBuf(incOptions=incOptions, incAsText=incAsText), NULL))
             if (isError(serial))
                 serial <- createErrorAnalysis(
                     as.character(serial),
