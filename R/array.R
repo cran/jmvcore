@@ -8,8 +8,10 @@ Array <- R6::R6Class("Array",
         .itemNames=NA,
         .itemKeys=NA,
         .template=NA,
-        .itemsExpr="0",
-        .itemsValue=0),
+        .itemsExpr='0',
+        .itemsValue=0,
+        .layout='none',
+        .hideHeadingOnlyChild=FALSE),
     active=list(
         items=function() private$.items,
         itemNames=function() private$.itemNames,
@@ -29,7 +31,10 @@ Array <- R6::R6Class("Array",
             title='no title',
             visible=TRUE,
             clearWith=NULL,
-            items=0) {
+            items=0,
+            layout='none',
+            hideHeadingOnlyChild=FALSE,
+            ...) {
 
             super$initialize(
                 options=options,
@@ -40,6 +45,8 @@ Array <- R6::R6Class("Array",
 
             private$.template <- template
             private$.itemsExpr <- paste(items)
+            private$.layout <- layout
+            private$.hideHeadingOnlyChild <- hideHeadingOnlyChild
 
             private$.items <- list()
             private$.itemKeys <- list()
@@ -104,7 +111,7 @@ Array <- R6::R6Class("Array",
 
             newKeys <- try(private$.options$eval(private$.itemsExpr, .key=private$.key, .name=private$.name, .index=private$.index), silent=TRUE)
 
-            if (inherits(newKeys, "try-error")) {
+            if (inherits(newKeys, 'try-error')) {
                 error <- newKeys
                 newKeys <- list()
             } else if (is.list(newKeys)) {
@@ -147,13 +154,7 @@ Array <- R6::R6Class("Array",
         .createItem=function(key, index) {
 
             item <- private$.template$clone(deep=TRUE)
-            item$.parent <- self
-
-            if (inherits(item, 'Group')) {
-                for (child in item$items) {
-                    child$.parent <- item
-                }
-            }
+            item$.setParent(self)
 
             item$.setKey(key, index)
             item$.update()
@@ -183,7 +184,7 @@ Array <- R6::R6Class("Array",
             if (noneVisible)
                 return('')
 
-            v <- paste0(pieces, collapse="")
+            v <- paste0(pieces, collapse='')
             if (v == '')
                 return('')
 
@@ -252,6 +253,10 @@ Array <- R6::R6Class("Array",
         asProtoBuf=function(incAsText=FALSE, status=NULL) {
 
             array <- RProtoBuf_new(jamovi.coms.ResultsArray)
+            if (identical(private$.layout, 'listSelect'))
+                array$layout <- jamovi.coms.ResultsArray$LayoutType$LIST_SELECT
+            if (identical(private$.hideHeadingOnlyChild, TRUE))
+                array$hideHeadingOnlyChild <- TRUE
 
             for (item in private$.items)
                 array$add("elements", item$asProtoBuf(incAsText=incAsText, status=status))
@@ -259,6 +264,11 @@ Array <- R6::R6Class("Array",
             result <- super$asProtoBuf(incAsText=incAsText, status=status)
             result$array <- array
             result
+        },
+        .setParent=function(parent) {
+            private$.parent <- parent
+            for (item in private$.items)
+                item$.setParent(self)
         })
 )
 
