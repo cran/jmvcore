@@ -125,10 +125,10 @@ Options <- R6::R6Class(
 
                         return(self[['get']](content))
 
-                    } else if (grepl('[A-Za-z][A-Za-z0-9]*:[A-Za-z][A-Za-z0-9]*', content)) {
+                    } else if (grepl('[A-Za-z][A-Za-z0-9]*:[A-Za-z][A-Za-z0-9-]*', content)) {
 
                         subed <- regexSub(
-                            '[A-Za-z][A-Za-z0-9]*:[A-Za-z][A-Za-z0-9]*',
+                            '[A-Za-z][A-Za-z0-9]*:[A-Za-z][A-Za-z0-9-]*',
                             content,
                             function(x) {
                                 split <- strsplit(x, ':')[[1]]
@@ -203,10 +203,24 @@ Options <- R6::R6Class(
         has=function(name) {
             name %in% names(private$.options)
         },
+        .removeOption=function(name) {
+            private$.options[[name]] <- NULL
+            private$.env[[name]] <- NULL
+
+            jamovi.coms.AnalysisOption.Other <- eval(parse(text='jamovi.coms.AnalysisOption.Other'))
+
+            # we signal that a results option has been cleared by sending it as NULL
+            for (i in seq_along(private$.pb$names)) {
+                if (name == private$.pb$names[[i]]) {
+                    private$.pb$options[[i]]$o <- jamovi.coms.AnalysisOption.Other$`NULL`
+                    break()
+                }
+            }
+        },
         levels=function(x) {
             str <- substitute(x)
             expr <- parse(text=paste0("if (is.null(", str, ")) NULL else base::levels(data[[", str, "]])"))
-            v = eval.parent(expr)
+            v <- eval.parent(expr)
             v
         },
         addChangeListener=function(listener) {
@@ -230,13 +244,19 @@ Options <- R6::R6Class(
                 optionPB <- pb$options[[i]]
                 value <- parseOptionPB(optionPB)
 
-                if (name == '.ppi') {
+                if (name == 'data') {
+                    next()
+                } else if (name == '.ppi') {
                     private$.ppi <- value
                 } else if (name == 'theme') {
                     private$.theme <- value
                 } else if (name %in% names(private$.options)) {
                     private$.options[[name]]$value <- value
                     private$.env[[name]] <- private$.options[[name]]$value
+                } else {
+                    # intended for results options
+                    option <- Option$new(name, value)
+                    self$.addOption(option)
                 }
             }
         },

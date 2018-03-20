@@ -323,20 +323,20 @@ format <- function(str, ..., context="normal") {
 
     for (name in names(args)) {
         value <- args[[name]]
-        if (grepl("^\\..+", name)) {
+        if (grepl("^\\..+", name)[1]) {
             name <- sub(".", "$", name, fixed=TRUE)
             str  <- gsub(name, value[1], str, fixed=TRUE)
         }
     }
 
-    if (grepl("{}", str, fixed=TRUE)) {
+    if (grepl("{}", str, fixed=TRUE)[1]) {
 
         for (token in args)
             str <- sub("{}", stringify(token, context), str, fixed=TRUE)
 
     } else {
 
-        if (grepl("\\{[0-9]+\\}", str)) {
+        if (grepl("\\{[0-9]+\\}", str)[1]) {
 
             i <- 0
             for (token in args) {
@@ -345,7 +345,7 @@ format <- function(str, ..., context="normal") {
             }
 
         }
-        if (grepl("\\{[a-zA-Z]+\\}", str)) {
+        if (grepl("\\{[a-zA-Z]+\\}", str)[1]) {
 
             for (name in names(args)) {
                 if (name != "" && is.null(args[[name]]) == FALSE) {
@@ -428,9 +428,6 @@ measureElements <- function(elems, sf=3, maxdp=Inf, scl=1e-3, sch=1e7, type='num
             elem <- elem$value
         }
 
-        if (pc)
-            elem <- elem * 100
-
         if (is.null(elem)) {
 
             maxstr <- max(maxstr, 1)  # width of '.'
@@ -475,6 +472,9 @@ measureElements <- function(elems, sf=3, maxdp=Inf, scl=1e-3, sch=1e7, type='num
 
             # non-scientific values
 
+            if (pc)
+                elem <- elem * 100
+
             if (is.integer(elem))
                 dp <- max(dp, 0)
             else
@@ -486,6 +486,9 @@ measureElements <- function(elems, sf=3, maxdp=Inf, scl=1e-3, sch=1e7, type='num
         } else {
 
             # scientific values
+
+            if (pc)
+                elem <- elem * 100
 
             exp <- floor(log10(abs(elem)))
             man <- elem / (10 ^ exp)
@@ -999,6 +1002,8 @@ canBeNumeric <- function(object) {
 #' @export
 toB64 <- function(names) {
     sapply(names, function(name) {
+        if (is.na(name))
+            return(NA)
         if (nchar(name) > 0)
             name <- base64enc::base64encode(charToRaw(name))
         if (endsWith(name, '=='))
@@ -1015,6 +1020,8 @@ toB64 <- function(names) {
 #' @export
 fromB64 <- function(names) {
     sapply(names, function(name) {
+        if (is.na(name))
+            return(NA)
         name <- substring(name, 2)
         name <- gsub('.', '+', name, fixed=TRUE)
         name <- gsub('_', '/', name, fixed=TRUE)
@@ -1056,4 +1063,19 @@ regexSub <- function(pattern, text, fun) {
     pieces <- extractRegexMatches(text, match)
     pieces <- sapply(pieces, fun, USE.NAMES=FALSE)
     replaceRegexMatches(text, match, pieces)
+}
+
+parseAddress <- function(address) {
+    if (nchar(address) == 0)
+        return (character())
+
+    match <- regexpr('^(.*?)\\/', address, perl=TRUE)
+    if (match != -1) {
+        n <- attr(match, 'match.length')
+        chunk   <- substring(address, 1, n - 1)
+        address <- substring(address, n + 1)
+        return (c(chunk, parseAddress(address)))
+    }
+
+    address
 }
