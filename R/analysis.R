@@ -118,8 +118,11 @@ Analysis <- R6::R6Class("Analysis",
 
             private$.checkpointCB <- NULL
         },
-        check=function(checkVars=TRUE) {
-            private$.options$check(checkVars=checkVars)
+        check=function(checkValues=FALSE, checkVars=FALSE, checkData=FALSE) {
+            private$.options$check(
+                checkValues=checkValues,
+                checkVars=checkVars,
+                checkData=checkData)
         },
         setStatus=function(status) {
             private$.status <- status
@@ -153,11 +156,11 @@ Analysis <- R6::R6Class("Analysis",
                     private$.data <- select(private$.data, self$options$varsRequired)
                 }
 
-                self$options$check(checkVars=FALSE)  # don't check vars till after the .update()
+                self$options$check(checkValues=TRUE)
                 self$results$.update()
                 self$options$check(checkVars=TRUE)
-
                 private$.init()
+                self$options$check(checkData=TRUE)
 
             }, silent=TRUE)
 
@@ -172,6 +175,8 @@ Analysis <- R6::R6Class("Analysis",
                 stack <- attr(result, 'stack')
                 self$setError(message, stack)
                 private$.status <- 'error'
+            } else if (self$options$gtg == FALSE) {
+                private$.status <- 'complete'
             } else if (private$.status != 'complete') {
                 private$.status <- 'inited'
             }
@@ -219,17 +224,23 @@ Analysis <- R6::R6Class("Analysis",
         },
         .save=function() {
             path <- private$.statePathSource()
-            pb <- self$asProtoBuf()
-            RProtoBuf_serialize(pb, path)
+            Encoding(path) <- 'UTF-8'
+            conn <- file(path, open="wb", raw=TRUE)
+            on.exit(close(conn), add=TRUE)
+            RProtoBuf_serialize(self$asProtoBuf(), conn)
         },
         .load=function(vChanges=character()) {
 
             initProtoBuf()
 
             path <- private$.statePathSource()
+            Encoding(path) <- 'UTF-8'
 
             if (base::file.exists(path)) {
-                pb <- RProtoBuf_read(jamovi.coms.AnalysisResponse, path)
+                conn <- file(path, open="rb", raw=TRUE)
+                on.exit(close(conn), add=TRUE)
+
+                pb <- RProtoBuf_read(jamovi.coms.AnalysisResponse, conn)
                 oChanges <- private$.options$compProtoBuf(pb$options)
                 private$.results$fromProtoBuf(pb$results, oChanges, vChanges)
             }
@@ -239,15 +250,11 @@ Analysis <- R6::R6Class("Analysis",
             if (isTRUE(private$.completeWhenFilled) && self$results$isFilled())
                 private$.status <- 'complete'
         },
-        render=function() {
-            # deprecated
-            # can remove this once laken's pushes the new TOSTER to CRAN
-        },
         .render=function(funName, image, ...) {
 
             if (image$requiresData && is.null(private$.data)) {
                 private$.data <- self$readDataset()
-                on.exit(private$.data <- NULL)
+                on.exit(private$.data <- NULL, add=TRUE)
             }
 
             t <- themes[[self$options$theme]]
@@ -289,6 +296,7 @@ Analysis <- R6::R6Class("Analysis",
                 base::Encoding(paths$relPath)  <- 'UTF-8'
 
                 fullPath <- paste0(paths$rootPath, '/', paths$relPath)
+                fullPath <- stringi::stri_enc_tonative(fullPath)
 
                 multip <- ppi / 72
 
@@ -302,7 +310,7 @@ Analysis <- R6::R6Class("Analysis",
                     height=image$height * multip,
                     bg='transparent',
                     res=72 * multip)
-                on.exit(grDevices::dev.off())
+                on.exit(grDevices::dev.off(), add=TRUE)
             }
 
             dataRequired <- FALSE
@@ -368,32 +376,12 @@ Analysis <- R6::R6Class("Analysis",
         .setCheckpoint=function(checkpoint) {
             private$.checkpointCB <- checkpoint
         },
-        .readState=function() {
-            try({
-                if (is.function(private$.statePathSource)) {
-                    statePath <- private$.statePathSource()
-                    if (file.exists(statePath)) {
-                        conn <- file(statePath, open="rb", raw=TRUE)
-                        pb <- RProtoBuf_read(jamovi.coms.ResultsElement, conn)
-                        close(conn)
-
-                        self$results$fromProtoBuf(pb, NULL, NULL)
-                    }
-                }
-            })
-        },
-        .saveState=function() {
-
-            if (is.function(private$.statePathSource)) {
-                statePath <- private$.statePathSource()
-                conn <- file(statePath, open="wb", raw=TRUE)
-                RProtoBuf_serialize(self$results$asProtoBuf(), conn)
-                close(conn)
-            }
-        },
         .savePart=function(path, part, ...) {
+            Encoding(path) <- 'UTF-8'
+            Encoding(part) <- 'UTF-8'
             partPath <- strsplit(part, '/', fixed=TRUE)[[1]]
             element <- self$results$.lookup(partPath)
+            path <- stringi::stri_enc_tonative(path)
             element$saveAs(path)
         },
         readDataset=function(headerOnly=FALSE) {

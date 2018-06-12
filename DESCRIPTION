@@ -1,8 +1,8 @@
 Package: jmvcore
 Type: Package
 Title: Dependencies for the 'jamovi' Framework
-Version: 0.8.5
-Date: 2018-03-20
+Version: 0.9.1
+Date: 2018-06-12
 Author: Jonathon Love
 Maintainer: Jonathon Love <jon@thon.cc>
 Description: A framework for creating rich interactive analyses for the jamovi
@@ -12,10 +12,10 @@ BugReports: https://github.com/jamovi/jmvcore/issues
 License: GPL (>= 2)
 ByteCompile: yes
 Depends: R (>= 3.2)
-Imports: R6 (>= 1.0.1), rjson, base64enc
+Imports: R6 (>= 1.0.1), rjson, base64enc, stringi
 Suggests: testthat (>= 1.0.2), RProtoBuf, knitr, ggplot2
 RoxygenNote: 6.0.1
 NeedsCompilation: no
-Packaged: 2018-03-20 09:23:56 UTC; jonathon
+Packaged: 2018-06-12 05:44:13 UTC; jonathon
 Repository: CRAN
-Date/Publication: 2018-03-20 12:00:26 UTC
+Date/Publication: 2018-06-12 13:33:29 UTC
