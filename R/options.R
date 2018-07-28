@@ -12,6 +12,7 @@ Options <- R6::R6Class(
         .env=NA,
         .ppi=72,
         .theme='default',
+        .palette='jmv',
         .requiresData=TRUE),
     active=list(
         analysis=function(analysis) {
@@ -38,6 +39,7 @@ Options <- R6::R6Class(
         names=function() names(private$.options),
         ppi=function() private$.ppi,
         theme=function() private$.theme,
+        palette=function() private$.palette,
         options=function() private$.options),
     public=list(
         initialize=function(requiresData=TRUE, ...) {
@@ -55,6 +57,8 @@ Options <- R6::R6Class(
                 private$.ppi <- args$ppi
             if ('theme' %in% names(args))
                 private$.theme <- args$theme
+            if ('palette' %in% names(args))
+                private$.palette <- args$palette
 
             private$.env[["levels"]] <- self$levels
         },
@@ -118,7 +122,7 @@ Options <- R6::R6Class(
                         data <- self[['.getData']]()
 
                         if (optionValue %in% colnames(data)) {
-                            return(levels(data[[optionValue]]))
+                            return(levels(as.factor(data[[optionValue]])))
                         } else {
                             reject("Variable '{}' does not exist in the data", optionValue, code=NULL)
                         }
@@ -225,8 +229,10 @@ Options <- R6::R6Class(
         },
         levels=function(x) {
             str <- substitute(x)
-            expr <- parse(text=paste0("if (is.null(", str, ")) NULL else base::levels(data[[", str, "]])"))
+            expr <- parse(text=paste0("if (is.null(", str, ")) NULL else base::levels(as.factor(data[[", str, "]]))"))
+            print(expr)
             v <- eval.parent(expr)
+            print(v)
             v
         },
         addChangeListener=function(listener) {
@@ -256,6 +262,8 @@ Options <- R6::R6Class(
                     private$.ppi <- value
                 } else if (name == 'theme') {
                     private$.theme <- value
+                } else if (name == 'palette') {
+                    private$.palette <- value
                 } else if (name %in% names(private$.options)) {
                     private$.options[[name]]$value <- value
                     private$.env[[name]] <- private$.options[[name]]$value
@@ -275,6 +283,12 @@ Options <- R6::R6Class(
                 if (name == 'theme') {
                     if ( ! identical(self$theme, parseOptionPB(optionPB)))
                          changes <- c(changes, 'theme')
+                    next()
+                }
+
+                if (name == 'palette') {
+                    if ( ! identical(self$palette, parseOptionPB(optionPB)))
+                        changes <- c(changes, 'palette')
                     next()
                 }
 
