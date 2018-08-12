@@ -260,7 +260,7 @@ ggPalette <- function(pal = 'jmv', scale = 'discrete') {
 
     return(
         list(ggplot2::discrete_scale("fill", "jmv", fill),
-             ggplot2::discrete_scale("color", "jmv", color))
+             ggplot2::discrete_scale("colour", "jmv", color))
     )
 }
 

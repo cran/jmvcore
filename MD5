@@ -1,4 +1,4 @@
-39422a8993de852094b1e7d99804219f *DESCRIPTION
+4b323a5286efa3521bfcd2cafb3c042b *DESCRIPTION
 08d1de71ccd50711ae3e62971261a51e *NAMESPACE
 e08f669d3d676841b4a53979bf3270d4 *R/analysis.R
 dccf968f68e119f155bc8c450deaef95 *R/array.R
@@ -17,7 +17,7 @@ ca40087eb50378317e4dad53f30e5f1c *R/package.R
 661625ffc5a1aaf3ee8d85332671cc6c *R/state.R
 2154a121e621c36a708424d438d8b3c7 *R/table-fold.R
 b7144caee48fcb4029d7b62834baad0e *R/table.R
-54ad84265519d1ec41edc094ccdb1fa2 *R/themes.R
+01814142e4b9215fe64028830f371ba8 *R/themes.R
 bebaafd6a5004b4d5c717ffbb0a950aa *R/utils.R
 cc8788b7e2f3a7afa73e374aead455d1 *inst/jamovi.proto
 dfa6b486e8d0335b38904590f132d6fc *man/Analysis.Rd
