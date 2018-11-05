@@ -203,6 +203,7 @@ lighten <- function(colours, amount) {
 #' @param type 'fill' or 'color'
 #'
 #' @return a vector of hex color codes
+#' @importFrom grDevices hcl
 #' @export
 colorPalette <- function(n = 5, pal = 'jmv', type='fill') {
 
@@ -233,6 +234,20 @@ colorPalette <- function(n = 5, pal = 'jmv', type='fill') {
             else
                 cols <- lighten(cols, .1)
         }
+
+    } else if (pal == 'hadley') {
+
+        ggColors <- function(n) {
+            hues <- seq(15, 375, length = n + 1)
+            hcl(h = hues, l = 65, c = 100)[1:n]
+        }
+
+        cols <- ggColors(n)
+
+        if (type == 'fill')
+            cols <- lighten(cols, .4)
+        else
+            cols <- lighten(cols, .1)
 
     } else {
 
