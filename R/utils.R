@@ -115,7 +115,21 @@ reject <- function(formats, code=NULL, ...) {
 #' @rdname decomposeTerm
 #' @export
 composeTerm <- function(components) {
-    components <- sapply(components, function(component) {
+
+    # handle ~1, ~0
+    if (length(components) == 1 &&
+        is.numeric(components) &&
+        (components == 1 || components == 0))
+            return(as.character(components))
+
+    components <- as.character(components)
+    uniques <- unique(components)
+    counts <- integer(length(uniques))
+    names(counts) <- uniques
+    for (component in components)
+        counts[component] <- counts[component] + 1
+
+    components <- sapply(uniques, function(component) {
         if (make.names(component) != component) {
             component <- gsub('\\', '\\\\', component, fixed=TRUE)
             component <- gsub('`', '\\`', component, fixed=TRUE)
@@ -123,6 +137,13 @@ composeTerm <- function(components) {
         }
         component
     }, USE.NAMES=FALSE)
+
+    for (i in seq_along(components)) {
+        count <- counts[i]
+        if (count != 1)
+            components[[i]] <- paste0('I(', components[[i]], '^', count, ')')
+    }
+
     term <- paste0(components, collapse=':')
     term
 }
@@ -200,6 +221,10 @@ decomposeTerms <- function(terms) {
     decomposed
 }
 
+#' Decompose a formula
+#' @param formula the formula to decompose
+#' @return a list of lists of the formulas components
+#' @export
 decomposeFormula <- function(formula) {
 
     chars <- as.character(formula)
@@ -243,8 +268,20 @@ decomposeFormula <- function(formula) {
     decomposeTerms(components)
 }
 
+#' rlang::enquo
+#' Simplifies things so packages overriding Analysis don't need
+#' to have rlang in their imports.
+#' This is intended for use by classes overriding Analysis
+#' @param arg the argument to enquote
+#' @return the quosure
+#' @export
 enquo <- rlang::enquo
 
+#' Evaluates a quosure
+#' This is intended for use by classes overriding Analysis
+#' @param quo the quosure to evaluate
+#' @return the value of the quosure
+#' @export
 resolveQuo <- function(quo) {
     if (rlang::is_null(quo))
         return(NULL)
@@ -286,14 +323,29 @@ resolveQuo <- function(quo) {
 #'
 #' @export
 stringifyTerm <- function(components, sep=getOption('jmvTermSep', ':')) {
-    components <- sapply(components, function(x) {
+
+    POWER_SUPS <- c('', '\u00B2', '\u00B3', '\u2074', '\u2075',
+                    '\u2076', '\u2077', '\u2078', '\u2079')
+
+    components <- unlist(components)
+    uniques <- unique(components)
+    counts <- integer(length(uniques))
+    names(counts) <- uniques
+    for (component in components)
+        counts[component] <- counts[component] + 1
+
+    components <- sapply(uniques, function(x) {
         if (startsWith(x, '`') && endsWith(x, '`')) {
             x <- substring(x, 2, nchar(x)-1)
             x <- gsub('`', '\\`', x, fixed=TRUE)
         }
         x
     })
+
+    components <- paste0(components, POWER_SUPS[counts])
+
     term <- paste(components, collapse=sep)
+
     Encoding(term) <- 'UTF-8'
     term
 }
@@ -789,29 +841,13 @@ composeFormula <- function(lht, rht) {
         rht <- lht
         lht <- NULL
     }
-    rhItems <- list()
-    lhItems <- list()
-    for (term in rht) {
-        term <- sapply(term, function(component) {
-            if (make.names(component) != component)
-                component <- paste0('`', gsub('`', '\\`', component, fixed=TRUE), '`')
-            return(component)
-        })
-        rhItems[[length(rhItems)+1]] <- paste0(term, collapse=":")
-    }
+
+    rhItems <- composeTerms(rht)
     rhs <- paste0(rhItems, collapse=' + ')
 
     if ( ! is.null(lht)) {
-        for (term in lht) {
-            term <- sapply(term, function(component) {
-                if (make.names(component) != component)
-                    component <- paste0('`', gsub('`', '\\`', component, fixed=TRUE), '`')
-                return(component)
-            })
-            lhItems[[length(lhItems)+1]] <- paste0(term, collapse=":")
-        }
+        lhItems <- composeTerms(lht)
         lhs <- paste0(lhItems, collapse=' + ')
-
         return(paste(lhs, '~', rhs))
     } else {
         return(paste('~', rhs))
@@ -1125,7 +1161,7 @@ toB64 <- function(names) {
             name <- substring(name, 1, nchar(name)-1)
         name <- gsub('+', '.', name, fixed=TRUE)
         name <- gsub('/', '_', name, fixed=TRUE)
-        name <- paste0('.', name)
+        name <- paste0('X', name)
     }, USE.NAMES=FALSE)
 }
 

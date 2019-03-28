@@ -1,26 +1,28 @@
 
 #' the jmvcore Object classes
 #' @export
-Analysis <- R6::R6Class("Analysis",
+Analysis <- R6::R6Class('Analysis',
     private=list(
-        .datasetId="",
-        .analysisId="",
-        .name="",
-        .package="",
-        .title="",
+        .datasetId='',
+        .analysisId='',
+        .name='',
+        .package='',
+        .title='',
         .options=NA,
         .results=NA,
-        .status="none",
+        .status='none',
         .completeWhenFilled=FALSE,
         .init=function() NULL,
         .clear=function(vChanges) NULL,
         .run=function() NULL,
+        .postInit=function() NULL,
         .readDataset=NA,
         .readDatasetHeader=NA,
         .statePathSource=NA,
         .resourcesPathSource=NA,
         .checkpointCB=NA,
         .data=NA,
+        .dataProvided=TRUE,
         .header=NA,
         .info=NA,
         .version=NA,
@@ -103,8 +105,8 @@ Analysis <- R6::R6Class("Analysis",
             results,
             pause=NULL,
             data=NULL,
-            datasetId="",
-            analysisId="",
+            datasetId='',
+            analysisId='',
             revision=0,
             completeWhenFilled=FALSE,
             ...) {
@@ -150,16 +152,14 @@ Analysis <- R6::R6Class("Analysis",
                 try <- tryStack
 
             result <- try({
-                if (private$.status != "none")
+                if (private$.status != 'none')
                     return()
-
-                wasNull <- FALSE
 
                 if ( ! self$options$requiresData) {
                     # do nothing
                 } else if (is.null(private$.data)) {
                     private$.data <- self$readDataset(TRUE)
-                    wasNull <- TRUE
+                    private$.dataProvided <- FALSE
                 } else {
                     if ( ! is.data.frame(private$.data))
                         reject("Argument 'data' must be a data frame")
@@ -174,9 +174,30 @@ Analysis <- R6::R6Class("Analysis",
 
             }, silent=TRUE)
 
+            if (isError(result)) {
+                message <- extractErrorMessage(result)
+                stack <- attr(result, 'stack')
+                self$setError(message, stack)
+                private$.status <- 'error'
+            } else if (self$options$gtg == FALSE) {
+                private$.status <- 'complete'
+            } else if (private$.status != 'complete') {
+                private$.status <- 'inited'
+            }
+        },
+        postInit=function(noThrow=FALSE) {
+
+            try <- dontTry
+            if (noThrow)
+                try <- tryStack
+
+            result <- try({
+                private$.postInit()
+            }, silent=TRUE)
+
             if ( ! self$options$requiresData) {
                 # do nothing
-            } else if (wasNull) {
+            } else if ( ! private$.dataProvided) {
                 private$.data <- NULL
             }
 
@@ -190,20 +211,20 @@ Analysis <- R6::R6Class("Analysis",
             } else if (private$.status != 'complete') {
                 private$.status <- 'inited'
             }
+
+            TRUE
         },
         run=function(noThrow=FALSE) {
 
-            if (private$.status != "inited")
+            if (private$.status != 'inited')
                 self$init()
 
-            wasNull <- FALSE
-
             if (is.null(private$.data)) {
-                wasNull <- TRUE
+                private$.dataProvided <- FALSE
                 private$.data <- self$readDataset()
             }
 
-            private$.status <- "running"
+            private$.status <- 'running'
 
             try <- dontTry
             if (noThrow)
@@ -213,7 +234,7 @@ Analysis <- R6::R6Class("Analysis",
                 result <- private$.run()
             }, silent=TRUE)
 
-            if (wasNull)
+            if ( ! private$.dataProvided)
                 private$.data <- NULL
 
             if (private$.status == 'restarting') {
@@ -235,7 +256,7 @@ Analysis <- R6::R6Class("Analysis",
         .save=function() {
             path <- private$.statePathSource()
             Encoding(path) <- 'UTF-8'
-            conn <- file(path, open="wb", raw=TRUE)
+            conn <- file(path, open='wb', raw=TRUE)
             on.exit(close(conn), add=TRUE)
             RProtoBuf_serialize(self$asProtoBuf(), conn)
         },
@@ -247,7 +268,7 @@ Analysis <- R6::R6Class("Analysis",
             Encoding(path) <- 'UTF-8'
 
             if (base::file.exists(path)) {
-                conn <- file(path, open="rb", raw=TRUE)
+                conn <- file(path, open='rb', raw=TRUE)
                 on.exit(close(conn), add=TRUE)
 
                 pb <- RProtoBuf_read(jamovi.coms.AnalysisResponse, conn)
@@ -301,13 +322,13 @@ Analysis <- R6::R6Class("Analysis",
             if ( ! is.character(funName))
                 stop('no render function', call.=FALSE)
 
-            if ( ! is.null(image$path))
+            if ( ! is.null(image$filePath))
                 return(FALSE)
-
-            render <- private[[funName]]
 
             if (image$visible == FALSE)
                 return(FALSE)
+
+            render <- private[[funName]]
 
             if (is.function(render) == FALSE) {
                 image$.setPath(NULL)
@@ -317,7 +338,7 @@ Analysis <- R6::R6Class("Analysis",
             if (is.function(private$.resourcesPathSource)) {
 
                 name <- base64enc::base64encode(base::charToRaw(image$name))
-                paths <- private$.resourcesPathSource(name, "png")
+                paths <- private$.resourcesPathSource(name, 'png')
 
                 base::Encoding(paths$rootPath) <- 'UTF-8'
                 base::Encoding(paths$relPath)  <- 'UTF-8'
@@ -422,7 +443,7 @@ Analysis <- R6::R6Class("Analysis",
             dataset
         },
         optionsChangedHandler=function(optionNames) {
-            private$.status <- "none"
+            private$.status <- 'none'
         },
         asProtoBuf=function(incAsText=FALSE) {
 
@@ -437,11 +458,11 @@ Analysis <- R6::R6Class("Analysis",
             response$version <- private$.version[1] * 16777216 + private$.version[2] * 65536 + private$.version[3] * 256
             response$revision <- private$.revision
 
-            if (private$.status == "inited") {
+            if (private$.status == 'inited') {
                 response$status <- jamovi.coms.AnalysisStatus$ANALYSIS_INITED;
-            } else if (private$.status == "running") {
+            } else if (private$.status == 'running') {
                 response$status <- jamovi.coms.AnalysisStatus$ANALYSIS_RUNNING;
-            } else if (private$.status == "complete") {
+            } else if (private$.status == 'complete') {
                 response$status <- jamovi.coms.AnalysisStatus$ANALYSIS_COMPLETE;
             } else {
                 response$status <- jamovi.coms.AnalysisStatus$ANALYSIS_ERROR
@@ -458,6 +479,36 @@ Analysis <- R6::R6Class("Analysis",
                 response$results <- self$results$asProtoBuf(incAsText=incAsText, status=response$status, prepend=prepend);
             } else {
                 response$results <- self$results$asProtoBuf(incAsText=incAsText, status=response$status, prepend=prepend);
+            }
+
+            ns <- getNamespace(private$.package)
+            if ('.jmvrefs' %in% names(ns)) {
+                refsLookup <- ns[['.jmvrefs']]
+                for (ref in private$.results$getRefs(recurse=TRUE)) {
+                    fullRef <- refsLookup[[ref]]
+                    if ( ! is.null(fullRef)) {
+                        refPB <- RProtoBuf_new(jamovi.coms.Reference)
+                        names <- names(fullRef)
+                        refPB$name <- ref
+                        if ('type' %in% names)
+                            refPB$type <- fullRef$type
+                        if ('author' %in% names)
+                            refPB$authors$complete <- fullRef$author
+                        if ('year' %in% names)
+                            refPB$year <- fullRef$year
+                        if ('title' %in% names)
+                            refPB$title <- fullRef$title
+                        if ('publisher' %in% names)
+                            refPB$publisher <- fullRef$publisher
+                        if ('url' %in% names)
+                            refPB$url <- fullRef$url
+                        if ('volume' %in% names)
+                            refPB$volume <- paste(fullRef$volume)
+                        if ('pages' %in% names)
+                            refPB$pages <- fullRef$pages
+                        response$add('references', refPB)
+                    }
+                }
             }
 
             response$options <- private$.options$asProtoBuf()

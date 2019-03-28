@@ -219,10 +219,10 @@ Options <- R6::R6Class(
 
             jamovi.coms.AnalysisOption.Other <- eval(parse(text='jamovi.coms.AnalysisOption.Other'))
 
-            # we signal that a results option has been cleared by sending it as NULL
+            # we signal that a results option has been cleared by sending it as NONE
             for (i in seq_along(private$.pb$names)) {
                 if (name == private$.pb$names[[i]]) {
-                    private$.pb$options[[i]]$o <- jamovi.coms.AnalysisOption.Other$`NULL`
+                    private$.pb$options[[i]]$o <- jamovi.coms.AnalysisOption.Other$`NONE`
                     break()
                 }
             }
@@ -870,7 +870,7 @@ OptionArray <- R6::R6Class(
                 if (length(value) == 1 && is.null(value[[1]]))
                     return('')
                 value <- value[ ! sapply(value, is.null)]
-                return (paste0('~', paste0(composeTerms(value), collapse='+')))
+                return (composeFormula(value))
             }
 
             # if ('OptionTerms' %in% class(private$.template)) {

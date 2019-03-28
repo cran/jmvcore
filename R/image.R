@@ -4,7 +4,7 @@
 Image <- R6::R6Class("Image",
     inherit=ResultsElement,
     private=list(
-        .path=NA,
+        .filePath=NA,
         .width=400,
         .height=300,
         .renderInitFun=NA,
@@ -14,7 +14,7 @@ Image <- R6::R6Class("Image",
     active=list(
         width=function() private$.width,
         height=function() private$.height,
-        path=function() private$.path,
+        filePath=function() private$.filePath,
         requiresData=function() private$.requiresData,
         plot=function() {
             if (is.null(private$.plot))
@@ -32,14 +32,16 @@ Image <- R6::R6Class("Image",
             name=NULL,
             title='',
             visible=TRUE,
-            clearWith='*') {
+            clearWith='*',
+            refs=character()) {
 
             super$initialize(
                 options=options,
                 name=name,
                 title=title,
                 visible=visible,
-                clearWith=clearWith)
+                clearWith=clearWith,
+                refs=refs)
 
             private$.width <- width
             private$.height <- height
@@ -47,7 +49,7 @@ Image <- R6::R6Class("Image",
             private$.renderInitFun <- renderInitFun
             private$.requiresData <- requiresData
 
-            private$.path <- NULL
+            private$.filePath <- NULL
             private$.plot <- NULL
         },
         setSize=function(width, height) {
@@ -57,7 +59,7 @@ Image <- R6::R6Class("Image",
         isFilled=function() {
             if (private$.stale)
                 return(FALSE)
-            if (is.null(private$.path))
+            if (is.null(private$.filePath))
                 return(FALSE)
             return(TRUE)
         },
@@ -109,14 +111,14 @@ Image <- R6::R6Class("Image",
             self$analysis$.createImage(funName=private$.renderFun, image=self, ...)
         },
         .setPath=function(path) {
-            private$.path <- path
+            private$.filePath <- path
         },
         asString=function() {
             return('')
         },
         asProtoBuf=function(incAsText=FALSE, status=NULL) {
 
-            path <- private$.path
+            path <- private$.filePath
             if (is.null(path))
                 path=''
 
@@ -127,7 +129,7 @@ Image <- R6::R6Class("Image",
 
             result <- super$asProtoBuf(incAsText=incAsText, status=status)
 
-            if (self$isFilled()) {
+            if (self$status == 'none' && self$isFilled()) {
 
                 result$status <- jamovi.coms.AnalysisStatus$ANALYSIS_COMPLETE
 
@@ -163,9 +165,9 @@ Image <- R6::R6Class("Image",
             private$.width <- image$width
             private$.height <- image$height
             if (image$path == '' || 'theme' %in% oChanges || 'palette' %in% oChanges)
-                private$.path <- NULL
+                private$.filePath <- NULL
             else
-                private$.path <- image$path
+                private$.filePath <- image$path
         },
         .setPlot=function(plot) {
             private$.plot <- plot

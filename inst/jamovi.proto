@@ -80,6 +80,24 @@ message AnalysisResponse {
     bool restartEngines = 12;
     string stacktrace = 13;
     uint32 version = 14;
+    int32 index = 15;
+    repeated Reference references = 16;
+}
+
+message Reference {
+    string name = 1;
+    string type = 2;
+    Authors authors = 3;
+    uint32 year = 4;
+    string title = 5;
+    string publisher = 6;
+    string url = 7;
+    string volume = 8;
+    string pages = 9;
+}
+
+message Authors {
+    string complete = 8;
 }
 
 message AnalysisOption {
@@ -87,7 +105,7 @@ message AnalysisOption {
     enum Other {
         FALSE = 0;
         TRUE  = 1;
-        NULL  = 2;
+        NONE  = 2;
     }
 
     oneof type {
@@ -223,4 +241,5 @@ message ResultsElement {
 
     bytes state = 14;
     Visible visible = 15;
+    repeated string refs = 16;
 }
