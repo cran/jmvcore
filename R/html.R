@@ -38,7 +38,8 @@ Html <- R6::R6Class("Html",
             title='',
             visible=TRUE,
             clearWith='*',
-            refs=character()) {
+            refs=character(),
+            content='') {
 
             super$initialize(
                 options=options,
@@ -47,6 +48,8 @@ Html <- R6::R6Class("Html",
                 visible=visible,
                 clearWith=clearWith,
                 refs=refs)
+
+            private$.content <- content
         },
         setContent=function(value) {
 
@@ -87,7 +90,12 @@ Html <- R6::R6Class("Html",
             return(TRUE)
         },
         asString=function() {
-            "\n  [No plain text representation available]\n\n"
+            content <- htmlToText(private$.content)
+            paras <- strsplit(content, '\n')
+            paras <- sapply(paras, strwrap, indent=1, exdent=1)
+            content <- paste0(paras, collapse="\n")
+            content <- paste0("\n", content, "\n")
+            content
         },
         fromProtoBuf=function(element, oChanges, vChanges) {
             if ( ! base::inherits(element, "Message"))

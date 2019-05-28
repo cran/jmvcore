@@ -181,6 +181,9 @@ decomposeTerm <- function(term) {
     components <- character()
     componentChars <- character()
     inQuote <- FALSE
+    inI <- FALSE
+    isExp <- FALSE
+    componentInProgress <- TRUE
 
     i <- 1
     n <- length(chars)
@@ -190,24 +193,59 @@ decomposeTerm <- function(term) {
         if (char == '`') {
             inQuote <- ! inQuote
         }
+        else if (inQuote == FALSE && char == 'I' && (i + 1 <= n) && chars[i + 1] == '(') {
+            inI <- TRUE
+            i <- i + 1
+        }
+        else if (inQuote == FALSE && inI == TRUE && (char == ')' || char == ':')) {
+            if (char == ')')
+                inI <- FALSE
+            if (isExp) {
+                prev <- component
+                component <- paste0(componentChars, collapse='')
+                exp <- as.numeric(component)
+                if (exp > 1) {
+                    component <- rep(prev, exp-1)
+                    components <- c(components, component)
+                }
+                componentChars <- character()
+                componentInProgress <- FALSE
+                isExp <- FALSE
+            }
+        }
+        else if (inQuote == FALSE && inI == TRUE && char == '^') {
+            component <- paste0(componentChars, collapse='')
+            components <- c(components, component)
+            componentChars <- character()
+            isExp <- TRUE
+        }
         else if (char == '\\') {
             i <- i + 1
             char <- chars[i]
             componentChars <- c(componentChars, char)
         }
         else if (char == ':' && inQuote == FALSE) {
-            component <- paste0(componentChars, collapse='')
-            components <- c(components, component)
+            if (componentInProgress) {
+                if (isExp)
+                    prev <- component
+                component <- paste0(componentChars, collapse='')
+                components <- c(components, component)
+            }
             componentChars <- character()
+            isExp <- FALSE
+            componentInProgress <- TRUE
         }
         else {
             componentChars <- c(componentChars, char)
+            componentInProgress <- TRUE
         }
         i <- i + 1
     }
 
-    component <- paste0(componentChars, collapse='')
-    components <- c(components, component)
+    if (componentInProgress) {
+        component <- paste0(componentChars, collapse='')
+        components <- c(components, component)
+    }
 
     components
 }
@@ -302,6 +340,7 @@ resolveQuo <- function(quo) {
 #'
 #' @param components a character vector of components
 #' @param sep a separator to go between the components
+#' @param raise whether duplicates should be raised to powers
 #' @return the components joined together into a string for disply
 #' @examples
 #' stringifyTerm(c('a', 'b', 'c'))
@@ -322,19 +361,22 @@ resolveQuo <- function(quo) {
 #' # "quoted * b * c"
 #'
 #' @export
-stringifyTerm <- function(components, sep=getOption('jmvTermSep', ':')) {
+stringifyTerm <- function(components, sep=getOption('jmvTermSep', ':'), raise=FALSE) {
 
     POWER_SUPS <- c('', '\u00B2', '\u00B3', '\u2074', '\u2075',
                     '\u2076', '\u2077', '\u2078', '\u2079')
 
-    components <- unlist(components)
-    uniques <- unique(components)
-    counts <- integer(length(uniques))
-    names(counts) <- uniques
-    for (component in components)
-        counts[component] <- counts[component] + 1
+    if (raise) {
+        components <- unlist(components)
+        uniques <- unique(components)
+        counts <- integer(length(uniques))
+        names(counts) <- uniques
+        for (component in components)
+            counts[component] <- counts[component] + 1
+        components <- uniques
+    }
 
-    components <- sapply(uniques, function(x) {
+    components <- sapply(components, function(x) {
         if (startsWith(x, '`') && endsWith(x, '`')) {
             x <- substring(x, 2, nchar(x)-1)
             x <- gsub('`', '\\`', x, fixed=TRUE)
@@ -342,7 +384,9 @@ stringifyTerm <- function(components, sep=getOption('jmvTermSep', ':')) {
         x
     })
 
-    components <- paste0(components, POWER_SUPS[counts])
+    if (raise) {
+        components <- paste0(components, POWER_SUPS[counts])
+    }
 
     term <- paste(components, collapse=sep)
 
@@ -1238,4 +1282,38 @@ trimws <- function (x, which = c("both", "left", "right"))
     if (which == "right")
         return(mysub("[ \t\r\n]+$", x))
     mysub("[ \t\r\n]+$", mysub("^[ \t\r\n]+", x))
+}
+
+htmlToText <- function(html) {
+
+    text <- html
+
+    text <- gsub("^\\s*<h[1-9]>", "", text)
+    text <- gsub("^\\s*<p>", "", text)
+
+    text <- gsub("<\\/?em>", "*", text)
+    text <- gsub("<\\/p>\\s*<p>", "\n\n", text)
+    text <- gsub("<\\/h[1-9]>\\s*<p>", "\n\n", text)
+
+    text <- gsub("<\\/p>", "\n\n", text)
+    text <- gsub("<\\/h[1-9]>", "\n\n", text)
+
+    text <- gsub("<p>", "\n\n", text)
+    text <- gsub("<h[1-9]>", "\n\n", text)
+    text <- gsub("<br>", "\n", text)
+    text <- gsub("<\\/?[a-zA-Z]+[1-9]*>", "", text)
+    text <- gsub(" +", " ", text)
+
+    text <- gsub("&alpha;", "\u03B1", text)
+    text <- gsub("&gt;", ">", text)
+    text <- gsub("&lt;", "<", text)
+    text <- gsub("&ne;", "\u2260", text)
+
+    text <- gsub("^\n+", "", text)
+    text <- gsub("\n+$", "", text)
+
+    text <- gsub("\n\n+", "\n\n", text)
+
+    Encoding(text) <- 'UTF-8'
+    text
 }

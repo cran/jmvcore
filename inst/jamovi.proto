@@ -93,7 +93,9 @@ message Reference {
     string publisher = 6;
     string url = 7;
     string volume = 8;
+    string issue = 10;
     string pages = 9;
+    string year2 = 11;
 }
 
 message Authors {
