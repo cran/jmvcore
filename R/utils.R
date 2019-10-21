@@ -501,12 +501,25 @@ format <- function(str, ..., context="normal") {
             }
 
         }
-        if (grepl("\\{[a-zA-Z]+\\}", str)[1]) {
+        if (grepl("\\{ *[A-Za-z][A-Za-z0-9]* *\\}", str)[1]) {
 
-            for (name in names(args)) {
-                if (name != "" && is.null(args[[name]]) == FALSE) {
-                    str <- gsub(paste0("{", name, "}"), stringify(args[[name]], context), str, fixed=TRUE)
+            match <- regexec('\\$?\\{ *([A-Za-z][A-Za-z0-9]*) *\\}', str)[[1]]
+            while (match[1] != -1) {
+                name   <- substring(str, match[2], match[2] + attr(match, 'match.length')[2] - 1)
+                before <- substring(str, 1, match[1] - 1)
+                after  <- substring(str, match[1] + attr(match, 'match.length')[1])
+                if (name %in% names(args)) {
+                    value <- args[[name]]
+                    if (length(value) == 0) {
+                        value <- '\u2026'
+                    } else {
+                        value <- stringify(args[[name]], context)
+                    }
+                } else {
+                    value <- '\u2026'
                 }
+                str <- paste0(before, value, after)
+                match <- regexec('\\{ *([A-Za-z][A-Za-z0-9]*?) *\\}', str)[[1]]
             }
         }
     }
@@ -1316,4 +1329,19 @@ htmlToText <- function(html) {
 
     Encoding(text) <- 'UTF-8'
     text
+}
+
+#' Determines the index where an item appears
+#' @export
+#' @param x the item to find
+#' @param table the object to search
+#' @return the index of where the item appears, or -1 if it isn't present
+matchSet <- function(x, table) {
+    x <- sort(x)
+    for (i in seq_along(table)) {
+        row <- sort(table[[i]])
+        if (identical(row, x))
+            return(i)
+    }
+    return(-1)
 }
