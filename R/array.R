@@ -73,7 +73,7 @@ Array <- R6::R6Class("Array",
         addItem=function(key) {
             index <- length(private$.items) + 1
             private$.itemKeys[[index]] <- key
-            private$.itemNames[[index]] <- rjson::toJSON(key)
+            private$.itemNames[[index]] <- toJSON(key)
             self$.createItem(key, index)
         },
         isFilled=function() {
@@ -144,7 +144,7 @@ Array <- R6::R6Class("Array",
             oldItems <- private$.items
 
             private$.itemKeys <- newKeys
-            private$.itemNames <- sapply(newKeys, rjson::toJSON, USE.NAMES=FALSE)
+            private$.itemNames <- sapply(newKeys, toJSON, USE.NAMES=FALSE)
             private$.items <- list()
 
             for (i in seq_along(newKeys)) {
@@ -173,7 +173,7 @@ Array <- R6::R6Class("Array",
             item$.setParent(self)
 
             item$.setKey(key, index)
-            item$.setName(rjson::toJSON(key))
+            item$.setName(toJSON(key))
             item$.update()
 
             private$.items[[index]] <- item
@@ -319,7 +319,7 @@ names.Array <- function(x) {
 }
 
 #' @export
-as.data.frame.Array <- function(x, ..., stringsAsFactors = default.stringsAsFactors()) {
+as.data.frame.Array <- function(x, ..., stringsAsFactors = FALSE) {
 
     call <- as.character(sys.call(-1)[2])
     children <- paste0('\n    as.data.frame(', call, '[[', 1:3, ']])', collapse='')

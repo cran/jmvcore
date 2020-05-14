@@ -12,6 +12,7 @@ Analysis <- R6::R6Class('Analysis',
         .results=NA,
         .status='none',
         .completeWhenFilled=FALSE,
+        .requiresMissings=FALSE,
         .init=function() NULL,
         .clear=function(vChanges) NULL,
         .run=function() NULL,
@@ -98,7 +99,8 @@ Analysis <- R6::R6Class('Analysis',
         complete=function() base::identical(private$.status, 'complete'),
         errored=function() base::identical(private$.status, 'error'),
         formula=function() private$.formula(),
-        parent=function() private$.parent),
+        parent=function() private$.parent,
+        requiresMissings=function() private$.requiresMissings),
     public=list(
         initialize=function(
             package,
@@ -112,6 +114,7 @@ Analysis <- R6::R6Class('Analysis',
             analysisId='',
             revision=0,
             completeWhenFilled=FALSE,
+            requiresMissings=FALSE,
             ...) {
 
             private$.package <- package
@@ -125,6 +128,7 @@ Analysis <- R6::R6Class('Analysis',
             private$.datasetId <- datasetId
             private$.revision <- revision
             private$.completeWhenFilled <- completeWhenFilled
+            private$.requiresMissings <- requiresMissings
 
             private$.results$.setParent(self)
             private$.options$analysis <- self
@@ -398,11 +402,21 @@ Analysis <- R6::R6Class('Analysis',
                 grType <- 'cairo'
                 if (Sys.info()['sysname'] == 'Windows')
                     grType <- 'windows'
+                else if (Sys.info()['sysname'] == 'Darwin')
+                    grType <- 'quartz'
+
+                width <- image$width * multip
+                height <- image$height * multip
+
+                if (width < 32)
+                    width <- 32
+                if (height < 32)
+                    height <- 32
 
                 grDevices::png(type=grType,
                     filename=fullPath,
-                    width=image$width * multip,
-                    height=image$height * multip,
+                    width=width,
+                    height=height,
                     bg='transparent',
                     res=72 * multip)
                 on.exit(grDevices::dev.off(), add=TRUE)
@@ -482,7 +496,13 @@ Analysis <- R6::R6Class('Analysis',
         .savePart=function(path, part, ...) {
             Encoding(path) <- 'UTF-8'
             Encoding(part) <- 'UTF-8'
-            partPath <- strsplit(part, '/', fixed=TRUE)[[1]]
+
+            # equivalent to strsplit(part, '/', fixed=TRUE)
+            # except ignores / inside quotes
+            m <- gregexpr('"[^"]+"|([^/]+)', part)[[1]]
+            l <- attr(m, 'match.length')
+            partPath <- vapply(seq_along(m), function(i) substr(part, m[i], m[i]+l[i]-1), '')
+
             element <- self$results$.lookup(partPath)
             path <- stringi::stri_enc_tonative(path)
             element$saveAs(path)
