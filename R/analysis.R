@@ -62,11 +62,15 @@ Analysis <- R6::R6Class('Analysis',
             }
         },
         .sourcifyOption=function(option) {
-            value <- option$value
-            def <- option$default
 
             if (option$name == 'data')
                 return('data = data')
+
+            if (startsWith(option$name, 'results/'))
+                return('')
+
+            value <- option$value
+            def <- option$default
 
             if ( ! ((is.numeric(value) && isTRUE(all.equal(value, def))) || base::identical(value, def))) {
                 valueAsSource <- option$valueAsSource
@@ -146,8 +150,6 @@ Analysis <- R6::R6Class('Analysis',
 
             private$.results$.setParent(self)
             private$.options$analysis <- self
-
-            private$.options$addChangeListener(private$.optionsChangedHandler)
 
             private$.checkpointCB <- NULL
 
@@ -323,7 +325,7 @@ Analysis <- R6::R6Class('Analysis',
                 conn <- file(path, open='wb', raw=TRUE)
                 on.exit(close(conn), add=TRUE)
                 RProtoBuf_serialize(self$asProtoBuf(), conn)
-            }, silent=TRUE)
+            }, silent=FALSE)
         },
         .load=function(vChanges=character()) {
 
@@ -346,7 +348,7 @@ Analysis <- R6::R6Class('Analysis',
 
                 if (isTRUE(private$.completeWhenFilled) && self$results$isFilled())
                     private$.status <- 'complete'
-            }, silent=TRUE)
+            }, silent=FALSE)
         },
         .createPlotObject=function(funName, image, ...) {
             if ( ! is.character(funName))
@@ -421,12 +423,22 @@ Analysis <- R6::R6Class('Analysis',
                 if (height < 32)
                     height <- 32
 
-                grDevices::png(type=grType,
-                    filename=fullPath,
-                    width=width,
-                    height=height,
-                    bg='transparent',
-                    res=72 * multip)
+                if (requireNamespace('ragg', quietly=TRUE)) {
+                    ragg::agg_png(
+                        filename=fullPath,
+                        width=width,
+                        height=height,
+                        units='px',
+                        background='transparent',
+                        res=ppi)
+                } else {
+                    grDevices::png(type=grType,
+                        filename=fullPath,
+                        width=width,
+                        height=height,
+                        bg='transparent',
+                        res=ppi)
+                }
                 on.exit(grDevices::dev.off(), add=TRUE)
             }
 
@@ -513,7 +525,17 @@ Analysis <- R6::R6Class('Analysis',
 
             element <- self$results$.lookup(partPath)
             path <- stringi::stri_enc_tonative(path)
+
+            dataRequired <- FALSE
+            if (element$requiresData && is.null(private$.data)) {
+                dataRequired <- TRUE
+                private$.data <- self$readDataset()
+            }
+
             element$saveAs(path)
+
+            if (dataRequired)
+                private$.data <- NULL
         },
         readDataset=function(headerOnly=FALSE) {
 

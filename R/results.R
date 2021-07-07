@@ -57,7 +57,8 @@ ResultsElement <- R6::R6Class("ResultsElement",
         },
         parent=function() {
             private$.parent
-        }),
+        },
+        requiresData=function() FALSE),
     public=list(
         initialize=function(
             options,
@@ -82,8 +83,6 @@ ResultsElement <- R6::R6Class("ResultsElement",
 
             private$.updated <- FALSE
             private$.state <- NULL
-
-            private$.options$addChangeListener(self$.optionsChanged)
         },
         isFilled=function() {
             if (private$.stale)
@@ -155,9 +154,6 @@ ResultsElement <- R6::R6Class("ResultsElement",
         },
         .render=function(image, ...) {
             FALSE
-        },
-        .optionsChanged=function(...) {
-            private$.updated <- FALSE
         },
         .has=function(name) {
             paste0(".", name) %in% names(private)

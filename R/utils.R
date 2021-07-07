@@ -979,7 +979,7 @@ extractErrorMessage <- function(error) {
     if (inherits(error, 'try-error'))
         error <- attr(error, 'condition')
 
-    if (inherits(error, 'simpleError')) {
+    if (inherits(error, 'error')) {
         message <- error$message
         message <- stringi::stri_encode(message, to='utf-8')
         return(message)
@@ -1235,7 +1235,9 @@ fromB64 <- function(names) {
         name <- substring(name, 2)
         name <- gsub('.', '+', name, fixed=TRUE)
         name <- gsub('_', '/', name, fixed=TRUE)
-        rawToChar(base64enc::base64decode(name))
+        value <- rawToChar(base64enc::base64decode(name))
+        Encoding(value) <- 'UTF-8'
+        value
     }, USE.NAMES=FALSE)
 }
 
@@ -1353,4 +1355,9 @@ matchSet <- function(x, table) {
 #' @importFrom jsonlite toJSON
 toJSON <- function(x) {
     as.character(jsonlite::toJSON(x, auto_unbox=TRUE))
+}
+
+#' @importFrom jsonlite fromJSON
+fromJSON <- function(x) {
+    jsonlite::fromJSON(x)
 }

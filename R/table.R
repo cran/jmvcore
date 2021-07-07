@@ -490,6 +490,8 @@ Table <- R6::R6Class('Table',
             if (is.null(note)) {
                 private$.notes[[key]] <- NULL
             } else if (is.character(note)) {
+                key  <- stringi::stri_encode(key, to='utf-8')
+                note <- stringi::stri_encode(note, to='utf-8')
                 private$.notes[[key]] <- Note$new(key, note[1], init)
             } else {
                 stop('Table$setNote(): note must be a character vector', call.=FALSE)
@@ -694,8 +696,6 @@ Table <- R6::R6Class('Table',
             paste0(pieces, collapse='')
         },
         fromProtoBuf=function(element, oChanges, vChanges) {
-            if ( ! base::inherits(element, 'Message'))
-                reject('Table$fromProtoBuf() expects a jamovi.coms.ResultsElement')
 
             someChanges <- length(oChanges) > 0 || length(vChanges) > 0
             if (someChanges && base::identical('*', private$.clearWith))

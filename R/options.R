@@ -6,7 +6,6 @@ Options <- R6::R6Class(
     private=list(
         .analysis=NA,
         .options=NA,
-        .listeners=NA,
         .pb=NA,
         .env=NA,
         .ppi=72,
@@ -47,7 +46,6 @@ Options <- R6::R6Class(
 
             private$.analysis <- NULL
             private$.options <- list()
-            private$.listeners <- list()
             private$.env <- new.env()
             private$.pb <- NULL
 
@@ -194,21 +192,6 @@ Options <- R6::R6Class(
 
             value
         },
-        set=function(...) {
-
-            values <- list(...)
-            for (name in names(values))
-                private$.options[[name]]$value <- values[[name]]
-
-            for (listener in private$.listeners)
-                listener(names(values))
-        },
-        setValue=function(name, value) {
-            private$.options[[name]]$value <- value
-
-            for (listener in private$.listeners)
-                listener(name)
-        },
         option=function(name) {
             private$.options[[name]]
         },
@@ -238,9 +221,6 @@ Options <- R6::R6Class(
             v <- eval.parent(expr)
             v
         },
-        addChangeListener=function(listener) {
-            private$.listeners[[length(private$.listeners)+1]] <- listener
-        },
         read=function(raw) {
             initProtoBuf()
             self$fromProtoBuf(jamovi.coms.AnalysisOptions$read(raw))
@@ -249,8 +229,6 @@ Options <- R6::R6Class(
             private$.pb
         },
         fromProtoBuf=function(pb) {
-            if ( ! "Message" %in% class(pb))
-                reject("Options::fromProtoBuf(): expected a jamovi.coms.ResultsElement")
 
             private$.pb <- pb
 
@@ -540,7 +518,7 @@ OptionVariables <- R6::R6Class(
 
             if (checkData) {
 
-                if ( ! 'factor' %in% private$.permitted && ! 'nominaltext' %in% private$.permitted) {
+                if ( ! 'factor' %in% private$.permitted && ! 'id' %in% private$.permitted && ! 'nominaltext' %in% private$.permitted) {
                     for (columnName in value) {
                         column <- data[[columnName]]
                         if ( ! canBeNumeric(column))
@@ -682,6 +660,28 @@ OptionVariable <- R6::R6Class(
 
 #' @rdname Options
 #' @export
+OptionOutput <- R6::R6Class(
+    "OptionOutput",
+    inherit=Option,
+    active=list(
+        value=function(v) {
+            if ( ! missing(v)) {
+                private$.value <- v
+                invisible(self)
+            } else {
+                isTRUE(private$.value$value)
+            }
+        },
+        synced=function() {
+            private$.value$synced
+        },
+        valueAsSource=function() {
+            ''
+        }
+    ))
+
+#' @rdname Options
+#' @export
 OptionTerms <- R6::R6Class(
     "OptionTerms",
     inherit=OptionArray,
@@ -807,6 +807,26 @@ OptionGroup <- R6::R6Class(
         }
     )
 )
+
+#' @rdname Options
+#' @export
+OptionPair <- R6::R6Class(
+    "OptionPair",
+    inherit=OptionGroup,
+    public=list(
+        initialize=function(name, value, permitted=NULL, suggested=NULL, ...) {
+            super$initialize(name, value, elements=list(
+                OptionVariable$new(
+                    "i1",
+                    NULL,
+                    suggested=suggested,
+                    permitted=permitted),
+                OptionVariable$new(
+                    "i2",
+                    NULL,
+                    suggested=suggested,
+                    permitted=permitted)))
+        }))
 
 #' @rdname Options
 #' @export
