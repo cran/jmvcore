@@ -1,8 +1,8 @@
 Package: jmvcore
 Type: Package
 Title: Dependencies for the 'jamovi' Framework
-Version: 1.8
-Date: 2021-07-07
+Version: 2.2
+Date: 2021-11-15
 Author: Jonathon Love
 Maintainer: Jonathon Love <jon@thon.cc>
 Description: A framework for creating rich interactive analyses for the jamovi
@@ -18,6 +18,6 @@ Suggests: testthat (>= 1.0.2), RProtoBuf, knitr, ggplot2, RColorBrewer,
         ragg
 RoxygenNote: 6.1.1
 NeedsCompilation: no
-Packaged: 2021-07-07 04:16:53 UTC; jonathon
+Packaged: 2021-11-15 11:14:55 UTC; jonathon
 Repository: CRAN
-Date/Publication: 2021-07-07 06:10:02 UTC
+Date/Publication: 2021-11-15 23:10:02 UTC

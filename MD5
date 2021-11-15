@@ -1,7 +1,7 @@
-333ce82f6df020ca7516b9acd6a01d2a *DESCRIPTION
-82bd75a9de75dd415de697c7e9941085 *NAMESPACE
+3b0b6ae53e939df20a31019515926211 *DESCRIPTION
+1f4236246691372b4085b347fe64d40d *NAMESPACE
 bf277e9b5e50d720d30effb93825afe7 *R/analysis.R
-6846235c3cc014e964ec6ffac93a008f *R/array.R
+6ed03fba91f7f192c6dd5f961b954d30 *R/array.R
 2d0d5c60fadecac72e68d86060bf1e4c *R/cell.R
 762ed0dafc37fa014adc007795aeab2a *R/column.R
 4196d9f209a37d14812fa80d51c5268d *R/create.R
@@ -18,8 +18,8 @@ f309c168c085cfd6973c6fb629c386b3 *R/results.R
 661625ffc5a1aaf3ee8d85332671cc6c *R/state.R
 2154a121e621c36a708424d438d8b3c7 *R/table-fold.R
 f74b8ff03872777b18dcf63c729312d4 *R/table.R
-5b74b200557d31d0f0312e5eae7eea2b *R/themes.R
-1213bea3057ad7e758efcc25279bc6dd *R/utils.R
+59f45b3cb7ed2f926ad2cdbb94399847 *R/themes.R
+a0f0f735b7cc49d5a44af19105b693a9 *R/utils.R
 d321d60e7e8514dbf82daf6f4d08763c *inst/jamovi.proto
 5cee9a04fa489a57b5271872566b6439 *man/Analysis.Rd
 da65e810bf51f4a54039b96289d4fdf9 *man/Cell.BEGIN_GROUP.Rd
@@ -31,7 +31,6 @@ dd28b5ff2d85750f4b6f0af87679a210 *man/colorPalette.Rd
 6722e8eddc99720981cc24ed4cf93695 *man/create.Rd
 9df4dcd9b34505ae74bf75139079cf51 *man/decomposeFormula.Rd
 5da9f66adcc2015940dae80a298ff3b9 *man/decomposeTerm.Rd
-eb68fcc5b8a5a26597af4be8add0818c *man/enquo.Rd
 ac946fe2bbcae868833f2859042fdb49 *man/extractErrorMessage.Rd
 26f9080c4ac61acd7f35d82b426f3ec7 *man/format.Rd
 256042cd6548ae162615933ede360ed6 *man/isError.Rd
@@ -39,6 +38,7 @@ d26dd011af3e44d8b7e59584f2e76075 *man/marshalData.Rd
 a875844badd6c9b272638aa17e79745c *man/marshalFormula.Rd
 05df4a5f248e3dfad8ea785ae2b705c4 *man/matchSet.Rd
 ad3ebec6cbd5d96f626ad793c25aed1f *man/naOmit.Rd
+37e0e3a0d65710802ffea6ec5740a438 *man/reexports.Rd
 e965c5f5589af6adb5648e68b307ca93 *man/reject.Rd
 fbfadddf23751f267fd89c4b9f7ada80 *man/resolveQuo.Rd
 ee348d371fd107c8fb7b6a2acac333e1 *man/select.Rd
