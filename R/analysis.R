@@ -156,6 +156,9 @@ Analysis <- R6::R6Class('Analysis',
             private$.parent <- NULL
             private$.addons <- list()
         },
+        translate=function(text, n=1) {
+            private$.options$translate(text, n)
+        },
         check=function(checkValues=FALSE, checkVars=FALSE, checkData=FALSE) {
             private$.options$check(
                 checkValues=checkValues,

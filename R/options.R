@@ -5,13 +5,17 @@ Options <- R6::R6Class(
     "Options",
     private=list(
         .analysis=NA,
+        .package=NA,
+        .name=NA,
         .options=NA,
         .pb=NA,
         .env=NA,
         .ppi=72,
         .theme='default',
         .palette='jmv',
-        .requiresData=TRUE),
+        .lang='',
+        .requiresData=TRUE,
+        .translator=NA),
     active=list(
         analysis=function(analysis) {
             if (missing(analysis))
@@ -40,14 +44,17 @@ Options <- R6::R6Class(
         palette=function() private$.palette,
         options=function() private$.options),
     public=list(
-        initialize=function(requiresData=TRUE, ...) {
+        initialize=function(package='jmv', name='', requiresData=TRUE, ...) {
 
+            private$.package <- package
+            private$.name <- name
             private$.requiresData <- requiresData
 
             private$.analysis <- NULL
             private$.options <- list()
             private$.env <- new.env()
             private$.pb <- NULL
+            private$.translator <- NULL
 
             args <- list(...)
             if ('.ppi' %in% names(args))
@@ -76,15 +83,33 @@ Options <- R6::R6Class(
         values=function() {
             private$.env
         },
+        translate=function(text, n=1) {
+
+            if (is.null(private$.translator)) {
+                if (private$.lang == '') {
+                    code <- Sys.getenv('LANGUAGE')
+                    if (code == '') {
+                        locale <- Sys.getlocale('LC_MESSAGES')
+                        code <- strsplit(locale, '.', fixed=TRUE)[[1]][1]
+                        if (is.null(code) || is.na(code))
+                            code <- 'en'
+                    }
+                    private$.lang <- code
+                }
+                private$.translator <- createTranslator(private$.package, private$.lang)
+            }
+
+            private$.translator$translate(text, n)
+        },
         eval=function(value, ...) {
 
-            if (class(value) == "character") {
+            if (inherits(value, 'character')) {
 
                 if (is.null(value))
                     return(NULL)
-                if (value == "TRUE")
+                if (value == 'TRUE')
                     return(TRUE)
-                if (value == "FALSE")
+                if (value == 'FALSE')
                     return(FALSE)
                 if (value == '')
                     return('')
@@ -132,10 +157,10 @@ Options <- R6::R6Class(
 
                         return(self[['get']](content))
 
-                    } else if (grepl('[A-Za-z][A-Za-z0-9]*:[A-Za-z][A-Za-z0-9-]*', content)) {
+                    } else if (grepl('[A-Za-z][A-Za-z0-9_]*:[A-Za-z][A-Za-z0-9_]*', content)) {
 
                         subed <- regexSub(
-                            '[A-Za-z][A-Za-z0-9]*:[A-Za-z][A-Za-z0-9-]*',
+                            '[A-Za-z][A-Za-z0-9_]*:[A-Za-z][A-Za-z0-9_]*',
                             content,
                             function(x) {
                                 split <- strsplit(x, ':')[[1]]
@@ -158,6 +183,7 @@ Options <- R6::R6Class(
 
                 } else if (grepl('^`.*`$', value)) {
 
+                    value <- self$translate(value)
                     value <- substring(value, 2, nchar(value)-1)
                     formatStr <- function(...) format(str=value, ...)
                     value <- do.call(formatStr, as.list(private$.env))
@@ -165,10 +191,12 @@ Options <- R6::R6Class(
                 } else {
 
                     nch <- nchar(value)
-                    if ( ! is.na(suppressWarnings(as.numeric(value))))
+                    if ( ! is.na(suppressWarnings(as.numeric(value)))) {
                         value <- as.numeric(value)
-                    else
+                    } else {
+                        value <- self$translate(value)
                         value <- jmvcore::format(value, ...)
+                    }
 
                     if (is.character(value))
                         Encoding(value) <- 'UTF-8'
@@ -245,6 +273,8 @@ Options <- R6::R6Class(
                     private$.theme <- value
                 } else if (name == 'palette') {
                     private$.palette <- value
+                } else if (name == '.lang') {
+                    private$.lang <- value
                 } else if (name %in% names(private$.options)) {
                     private$.options[[name]]$value <- value
                     private$.env[[name]] <- private$.options[[name]]$value
