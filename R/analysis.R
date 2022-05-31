@@ -552,7 +552,7 @@ Analysis <- R6::R6Class('Analysis',
         optionsChangedHandler=function(optionNames) {
             private$.status <- 'none'
         },
-        asProtoBuf=function(incAsText=FALSE) {
+        asProtoBuf=function(final=FALSE) {
 
             self$init()
             initProtoBuf()
@@ -579,14 +579,13 @@ Analysis <- R6::R6Class('Analysis',
             if ( ! identical(private$.stacktrace, ''))
                 prepend[[length(prepend)+1]] <- RProtoBuf_new(jamovi.coms.ResultsElement, name='debug', title='Debug', preformatted=private$.stacktrace)
 
-            if (incAsText) {
-                response$incAsText <- TRUE
-                syntax <- RProtoBuf_new(jamovi.coms.ResultsElement, name='syntax', preformatted=self$asSource())
-                prepend <- c(list(syntax), prepend)
-                response$results <- self$results$asProtoBuf(incAsText=incAsText, status=response$status, prepend=prepend);
-            } else {
-                response$results <- self$results$asProtoBuf(incAsText=incAsText, status=response$status, prepend=prepend);
-            }
+            syntax <- RProtoBuf_new(jamovi.coms.ResultsElement, name='syntax', preformatted=self$asSource())
+            prepend <- c(list(syntax), prepend)
+            response$final <- final
+
+            # note we have to use incAsText for backward compatibility with Rj
+            # otherwise i would have renamed all these 'final'
+            response$results <- self$results$asProtoBuf(incAsText=final, status=response$status, prepend=prepend);
 
             ns <- getNamespace(private$.package)
             if ('.jmvrefs' %in% names(ns)) {
@@ -628,17 +627,24 @@ Analysis <- R6::R6Class('Analysis',
 
             response
         },
-        serialize=function(incAsText=FALSE) {
-            serial <- tryStack(RProtoBuf_serialize(self$asProtoBuf(incAsText=incAsText), NULL))
-            if (isError(serial))
-                serial <- createErrorAnalysis(
-                    as.character(serial),
-                    attr(serial, 'stack'),
-                    private$.package,
-                    private$.name,
-                    private$.datasetId,
-                    private$.analysisId,
-                    private$.revision)$serialize()
+        serialize=function(final=FALSE, createErrorOnFailure=TRUE) {
+            serial <- tryStack(RProtoBuf_serialize(self$asProtoBuf(final=final), NULL))
+            if (isError(serial)) {
+                if (createErrorOnFailure) {
+                    error <- createErrorAnalysis(
+                        as.character(serial),
+                        attr(serial, 'stack'),
+                        private$.package,
+                        private$.name,
+                        private$.datasetId,
+                        private$.analysisId,
+                        private$.revision)
+                    # createErrorOnFailure=FALSE to prevent possible recursion
+                    serial <- error$serialize(createErrorOnFailure=FALSE)
+                } else {
+                    serial <- NULL
+                }
+            }
             serial
         },
         asSource=function() {
