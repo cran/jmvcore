@@ -1,10 +1,22 @@
 
 .i18n <- new.env()
 
+#' Designate string as translated
+#' @param text the string to translate
+#' @param n the number (if applicable) for pluralisation
 #' @export
 . <- function(text, n=1) {
     self <- eval.parent(str2lang('self'))
     self$options$translate(text, n)
+}
+
+#' Designate string as client-side translated
+#' @param format a format string
+#' @param values a string or named list of strings to substitute
+#' @export
+.. <- function(format, values=NULL) {
+    paste0(format, '\u0004',
+        `if`(is.null(values), NULL, jsonlite::toJSON(values, auto_unbox=TRUE)))
 }
 
 Translator <- R6Class('Translator',
