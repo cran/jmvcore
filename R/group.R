@@ -171,7 +171,6 @@ Group <- R6::R6Class("Group",
                 return('')
 
             v <- paste0(pieces, collapse="")
-            Encoding(v) <- 'UTF-8'
             v
         },
         fromProtoBuf=function(pb, oChanges, vChanges) {
@@ -183,26 +182,25 @@ Group <- R6::R6Class("Group",
 
             for (itemPB in pb$group$elements) {
                 itemName <- itemPB$name
-                Encoding(itemName) <- 'UTF-8'
                 target <- private$.items[[itemName]]
 
                 if ( ! is.null(target))
                     target$fromProtoBuf(itemPB, oChanges, vChanges)
             }
         },
-        asProtoBuf=function(incAsText=FALSE, status=NULL, prepend=NULL, append=NULL) {
+        asProtoBuf=function(incAsText=FALSE, status=NULL, prepend=NULL, append=NULL, includeState=TRUE) {
             group <- RProtoBuf::new(jamovi.coms.ResultsGroup)
 
             for (prep in prepend)
                 group$add("elements", prep)
 
             for (item in private$.items) {
-                itemPB <- item$asProtoBuf(incAsText=incAsText, status=status)
+                itemPB <- item$asProtoBuf(incAsText=incAsText, status=status, includeState=includeState)
                 if ( ! is.null(itemPB))
                     group$add("elements", itemPB)
             }
 
-            result <- super$asProtoBuf(incAsText=incAsText, status=status)
+            result <- super$asProtoBuf(incAsText=incAsText, status=status, includeState=includeState)
             result$group <- group
 
             result

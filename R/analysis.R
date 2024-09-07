@@ -55,7 +55,7 @@ Analysis <- R6::R6Class('Analysis',
 
             results <- NULL
             if (flush)
-                results <- RProtoBuf_serialize(self$asProtoBuf(), NULL)
+                results <- RProtoBuf_serialize(self$asProtoBuf(includeState=FALSE), NULL)
 
             cmd <- private$.checkpointCB(results)
 
@@ -357,7 +357,6 @@ Analysis <- R6::R6Class('Analysis',
         .save=function() {
             try({
                 path <- private$.statePathSource()
-                Encoding(path) <- 'UTF-8'
                 conn <- file(path, open='wb', raw=TRUE)
                 on.exit(close(conn), add=TRUE)
                 RProtoBuf_serialize(self$asProtoBuf(), conn)
@@ -369,7 +368,6 @@ Analysis <- R6::R6Class('Analysis',
                 initProtoBuf()
 
                 path <- private$.statePathSource()
-                Encoding(path) <- 'UTF-8'
 
                 if (base::file.exists(path)) {
                     conn <- file(path, open='rb', raw=TRUE)
@@ -436,12 +434,7 @@ Analysis <- R6::R6Class('Analysis',
 
                 name <- base64enc::base64encode(base::charToRaw(image$name))
                 paths <- private$.resourcesPathSource(name, 'png')
-
-                base::Encoding(paths$rootPath) <- 'UTF-8'
-                base::Encoding(paths$relPath)  <- 'UTF-8'
-
                 fullPath <- paste0(paths$rootPath, '/', paths$relPath)
-                fullPath <- stringi::stri_enc_tonative(fullPath)
 
                 multip <- ppi / 72
 
@@ -550,8 +543,6 @@ Analysis <- R6::R6Class('Analysis',
             private$.parent <- parent
         },
         .savePart=function(path, part, ...) {
-            Encoding(path) <- 'UTF-8'
-            Encoding(part) <- 'UTF-8'
 
             # equivalent to strsplit(part, '/', fixed=TRUE)
             # except ignores / inside quotes
@@ -560,7 +551,6 @@ Analysis <- R6::R6Class('Analysis',
             partPath <- vapply(seq_along(m), function(i) substr(part, m[i], m[i]+l[i]-1), '')
 
             element <- self$results$.lookup(partPath)
-            path <- stringi::stri_enc_tonative(path)
 
             dataRequired <- FALSE
             if (element$requiresData && is.null(private$.data)) {
@@ -586,7 +576,7 @@ Analysis <- R6::R6Class('Analysis',
         optionsChangedHandler=function(optionNames) {
             private$.status <- 'none'
         },
-        asProtoBuf=function(final=FALSE) {
+        asProtoBuf=function(final=FALSE, includeState=TRUE) {
 
             self$init()
             initProtoBuf()
@@ -642,7 +632,7 @@ Analysis <- R6::R6Class('Analysis',
 
             # note we have to use incAsText for backward compatibility with Rj
             # otherwise i would have renamed all these 'final'
-            response$results <- self$results$asProtoBuf(incAsText=final, status=response$status, prepend=prepend);
+            response$results <- self$results$asProtoBuf(incAsText=final, status=response$status, prepend=prepend, includeState=includeState);
 
             ns <- getNamespace(private$.package)
             if ('.jmvrefs' %in% names(ns)) {
@@ -684,8 +674,8 @@ Analysis <- R6::R6Class('Analysis',
 
             response
         },
-        serialize=function(final=FALSE, createErrorOnFailure=TRUE) {
-            serial <- tryStack(RProtoBuf_serialize(self$asProtoBuf(final=final), NULL))
+        serialize=function(final=FALSE, createErrorOnFailure=TRUE, includeState=TRUE) {
+            serial <- tryStack(RProtoBuf_serialize(self$asProtoBuf(final=final, includeState=includeState), NULL))
             if (isError(serial)) {
                 if (createErrorOnFailure) {
                     error <- createErrorAnalysis(

@@ -197,9 +197,6 @@ Options <- R6::R6Class(
                         value <- self$translate(value)
                         value <- jmvcore::format(value, ...)
                     }
-
-                    if (is.character(value))
-                        Encoding(value) <- 'UTF-8'
                 }
 
                 if (length(names(vars)) > 0)
@@ -276,8 +273,9 @@ Options <- R6::R6Class(
                 } else if (name == '.lang') {
                     private$.lang <- value
                 } else if (name %in% names(private$.options)) {
-                    private$.options[[name]]$value <- value
-                    private$.env[[name]] <- private$.options[[name]]$value
+                    option <- private$.options[[name]]
+                    option$value <- value
+                    private$.env[[name]] <- option$value
                 } else {
                     # intended for results options
                     option <- Option$new(name, value)
@@ -306,12 +304,21 @@ Options <- R6::R6Class(
                 if ( ! name %in% names(private$.options))
                     next()
 
-                currentValue <- private$.options[[name]]$value
-
                 value <- parseOptionPB(optionPB)
-                clone <- private$.options[[name]]$clone(deep=TRUE)
-                clone$value <- value
-                oldValue <- clone$value
+                option <- private$.options[[name]]
+                currentValue <- option$value
+
+                if (inherits(option, 'OptionAction')) {
+                    # if an OptionAction is TRUE, then we want that to trigger clearWiths
+                    # if it's FALSE, we don't want to trigger clearWiths
+                    # so we hack the old value to be a FALSE
+                    oldValue <- FALSE
+                } else {
+                    clone <- option$clone(deep=TRUE)
+                    clone$value <- value
+                    oldValue <- clone$value
+                }
+
                 if ( ! identical(currentValue, oldValue))
                     changes <- c(changes, name)
             }
@@ -1010,10 +1017,8 @@ parseOptionPB <- function(pb) {
         value <- pb$i
     else if (pb$has('d'))
         value <- pb$d
-    else if (pb$has('s')) {
+    else if (pb$has('s'))
         value <- pb$s
-        Encoding(value) <- 'UTF-8'
-    }
     else if (pb$has('o')) {
 
         # this isn't necessary, but without it the R linter complains :/
