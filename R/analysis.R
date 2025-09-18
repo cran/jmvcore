@@ -18,7 +18,7 @@ PlotObject <- R6::R6Class('PlotObject',
 Analysis <- R6::R6Class('Analysis',
     private=list(
         .datasetId='',
-        .analysisId='',
+        .analysisId=0,
         .name='',
         .package='',
         .title='',
@@ -435,6 +435,13 @@ Analysis <- R6::R6Class('Analysis',
                 name <- base64enc::base64encode(base::charToRaw(image$name))
                 paths <- private$.resourcesPathSource(name, 'png')
                 fullPath <- paste0(paths$rootPath, '/', paths$relPath)
+
+                decSymbol <- self$options$decSymbol
+                currentDecSymbol <- getOption('OutDec', '.')
+                if (decSymbol != '.' && currentDecSymbol != decSymbol) {
+                    options(OutDec=decSymbol)
+                    on.exit(options(OutDec=currentDecSymbol), add=TRUE)
+                }
 
                 multip <- ppi / 72
 

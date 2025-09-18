@@ -217,7 +217,8 @@ ResultsElement <- R6::R6Class("ResultsElement",
             if (includeState && ! is.null(state)) {
                 conn <- rawConnection(raw(), 'r+')
                 base::saveRDS(state, file=conn)
-                state <- rawConnectionValue(conn)
+                uncompressed <- rawConnectionValue(conn)
+                state <- memCompress(uncompressed)
                 close(conn)
                 if (length(state) > 500000)
                     cat(paste0('WARNING: state object for ', self$path, ' is too large (', length(state), ').\nSee here for details: https://dev.jamovi.org/tuts0203-state.html#setstate()'))
@@ -261,7 +262,8 @@ ResultsElement <- R6::R6Class("ResultsElement",
             }
 
             if ( ! base::identical(pb$state, raw())) {
-                conn <- rawConnection(pb$state, 'r')
+                uncompressed <- memDecompress(pb$state, type='gzip')
+                conn <- rawConnection(uncompressed, 'r')
                 state <- base::readRDS(file=conn)
                 private$.state <- state
                 close(conn)

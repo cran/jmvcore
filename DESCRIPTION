@@ -1,8 +1,8 @@
 Package: jmvcore
 Type: Package
 Title: Dependencies for the 'jamovi' Framework
-Version: 2.6.3
-Date: 2024-09-07
+Version: 2.7.7
+Date: 2025-09-18
 Authors@R: c(person("Jonathon", "Love", role=c("aut", "cre", "cph"), email="jon@thon.cc"))
 Maintainer: Jonathon Love <jon@thon.cc>
 Description: A framework for creating rich interactive analyses for the jamovi
@@ -14,10 +14,10 @@ ByteCompile: yes
 Depends: R (>= 3.2)
 Imports: R6 (>= 1.0.1), rlang (>= 0.3.0.1), jsonlite, base64enc
 Suggests: testthat (>= 1.0.2), RProtoBuf, knitr, ggplot2, RColorBrewer,
-        ragg, fastmap
+        ragg, fastmap, export
 RoxygenNote: 6.1.1
 NeedsCompilation: no
-Packaged: 2024-09-07 12:06:21 UTC; c3113592
+Packaged: 2025-09-17 23:31:51 UTC; c3113592
 Author: Jonathon Love [aut, cre, cph]
 Repository: CRAN
-Date/Publication: 2024-09-07 12:40:02 UTC
+Date/Publication: 2025-09-18 05:10:30 UTC

@@ -283,7 +283,8 @@ Output <- R6::R6Class('Output',
                         } else {
                             if ( ! is.factor(column))
                                 column <- as.factor(column)
-                            outputPB$i <- as.numeric(column)
+                            numbers <- as.numeric(column)
+                            outputPB$i <- ifelse(is.na(numbers), -2147483648, numbers)
                             lvls <- levels(column)
                             for (i in seq_along(lvls)) {
                                 levelPB <- RProtoBuf_new(jamovi.coms.VariableLevel)

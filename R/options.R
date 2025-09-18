@@ -13,6 +13,7 @@ Options <- R6::R6Class(
         .ppi=72,
         .theme='default',
         .palette='jmv',
+        .decSymbol='.',
         .lang='',
         .requiresData=TRUE,
         .translator=NA),
@@ -42,6 +43,7 @@ Options <- R6::R6Class(
         ppi=function() private$.ppi,
         theme=function() private$.theme,
         palette=function() private$.palette,
+        decSymbol=function() private$.decSymbol,
         options=function() private$.options),
     public=list(
         initialize=function(package='jmv', name='', requiresData=TRUE, ...) {
@@ -63,6 +65,8 @@ Options <- R6::R6Class(
                 private$.theme <- args$theme
             if ('palette' %in% names(args))
                 private$.palette <- args$palette
+            if ('decSymbol' %in% names(args))
+                private$.decSymbol <- args$decSymbol
 
             private$.env[["levels"]] <- self$levels
         },
@@ -270,6 +274,8 @@ Options <- R6::R6Class(
                     private$.theme <- value
                 } else if (name == 'palette') {
                     private$.palette <- value
+                } else if (name == 'decSymbol') {
+                    private$.decSymbol <- value
                 } else if (name == '.lang') {
                     private$.lang <- value
                 } else if (name %in% names(private$.options)) {
